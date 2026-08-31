@@ -1,0 +1,148 @@
+// Prisma schema — Quran School
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum QuestionKind {
+  MCQ
+  TRUE_FALSE
+  INPUT
+}
+
+enum SessionPhase {
+  LOBBY
+  QUESTION
+  ANSWER_REVIEW
+  LEADERBOARD
+  CLOSED
+}
+
+model Teacher {
+  id         String    @id @default(cuid())
+  clerkId    String    @unique
+  name       String
+  email      String?
+  phone      String?
+  createdAt  DateTime  @default(now())
+
+  quizzes    Quiz[]
+  sessions   Session[]
+}
+
+model Student {
+  id         String    @id @default(cuid())
+  clerkId    String    @unique
+  name       String
+  email      String?
+  phone      String?
+  createdAt  DateTime  @default(now())
+
+  answers    PracticeAnswer[]
+  sessionParticipations SessionParticipant[]
+}
+
+model Quiz {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  authorId    String
+  author      Teacher     @relation(fields: [authorId], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  questions   Question[]
+  sessions    Session[]
+}
+
+model Question {
+  id          String      @id @default(cuid())
+  quizId      String
+  quiz        Quiz        @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  kind        QuestionKind
+  text        String
+  timeLimitSec Int        @default(20)
+  order       Int
+
+  options     Option[]
+  answers     PracticeAnswer[]
+  sessionAnswers SessionAnswer[]
+}
+
+model Option {
+  id        String   @id @default(cuid())
+  questionId String
+  question  Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text      String
+  isCorrect Boolean
+  order     Int
+}
+
+model Session {
+  id            String         @id @default(cuid())
+  joinCode        String         @unique
+  quizId        String
+  quiz          Quiz        @relation(fields: [quizId], references: [id])
+  hostId        String
+  host          Teacher        @relation(fields: [hostId], references: [id])
+  phase         SessionPhase   @default(LOBBY)
+  phaseStartedAt DateTime      @default(now())
+  currentQuestionIndex Int     @default(0)
+  questionStartedAt DateTime?
+  closedAt      DateTime?
+  createdAt     DateTime       @default(now())
+
+  participants  SessionParticipant[]
+  answers       SessionAnswer[]
+}
+
+model SessionParticipant {
+  id         String   @id @default(cuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId   String?
+  student     Student?  @relation(fields: [studentId], references: [id])
+  nickname   String
+  totalScore Int       @default(0)
+  streak     Int       @default(0)
+
+  answers    SessionAnswer[]
+
+  @@unique([sessionId, nickname])
+}
+
+model SessionAnswer {
+  id              String   @id @default(cuid())
+  sessionId       String
+  session         Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participantId   String
+  participant     SessionParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  questionId      String
+  question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  chosenOptionId  String?
+  isCorrect       Boolean
+  points          Int
+  timeMs          Int
+}
+
+model PracticeAnswer {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  textAnswer  String?
+  chosenOptionId String?
+  isCorrect   Boolean?
+  reviewedAt  DateTime?
+  scoreById   String?
+  notes       String?
+
+  @@unique([studentId, questionId])
+}
+

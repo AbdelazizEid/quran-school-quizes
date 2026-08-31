@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>comp-b — القاعة</title>
+<style>
+  :root { --parchment:#f8f4ec; --ink:#2a1f10; --ink-deep:#1f150a; --gold:#b0884b; --ink-body:#5c4a25; --ink-muted:#6b5a36; --rule:#e6dccb; --wash:#efe4d4; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--parchment); color:var(--ink); font-family:"Thmanyah Sans","Segoe UI",Tahoma,sans-serif; min-height:100vh; padding:4rem 3rem 6rem; }
+  .wrap { max-width:72rem; margin:0 auto; display:grid; grid-template-columns:1.1fr .9fr; gap:4rem; align-items:center; }
+  header { position:absolute; top:1.5rem; inset-inline-start:3rem; display:flex; align-items:center; gap:.75rem; }
+  .medallion { display:inline-block; width:14px; height:14px; border-radius:9999px; border:2px solid var(--gold); box-shadow: inset 0 0 0 3px var(--parchment), inset 0 0 0 4.5px var(--gold); }
+  .kicker { font-size:.75rem; letter-spacing:.3em; text-transform:uppercase; color:var(--gold); direction:ltr; }
+  h1 { font-family:"Thmanyah Serif Display","Thmanyah Serif Text","Times New Roman",serif; font-size:clamp(3rem,6vw,4rem); line-height:1.15; font-weight:700; }
+  .lead { margin-top:1.25rem; font-size:1.25rem; line-height:1.7; color:var(--ink-body); }
+  .actions { margin-top:2.5rem; display:flex; gap:1.25rem; flex-wrap:wrap; }
+  .btn-primary { background:var(--ink); color:var(--parchment); padding:1rem 2rem; font-size:1.125rem; font-weight:600; border:none; border-radius:12px; font-family:inherit; }
+  .btn-outline { background:transparent; color:var(--ink); padding:1rem 2rem; font-size:1.125rem; font-weight:600; border:1px solid var(--gold); border-radius:12px; font-family:inherit; }
+  /* الجانب الآخر: عرض آلية الانضمام */
+  .demo { border-inline-start:1px solid var(--rule); padding-inline-start:3rem; }
+  .demo-label { font-size:.75rem; letter-spacing:.3em; text-transform:uppercase; color:var(--gold); direction:ltr; text-align:end; margin-bottom:1rem; }
+  .pin { font-family:"Thmanyah Serif Display","Times New Roman",serif; font-size:clamp(4rem,7vw,5.5rem); font-weight:700; letter-spacing:.12em; color:var(--ink); direction:ltr; text-align:end; }
+  .pin span { color:var(--gold); }
+  .demo-note { margin-top:.75rem; text-align:end; font-size:.875rem; color:var(--ink-muted); line-height:1.6; }
+  .qr { margin-top:2rem; width:96px; height:96px; margin-inline-start:auto; background:
+    conic-gradient(var(--ink) 0 25%, transparent 0 50%, var(--ink) 0 75%, transparent 0) 0 0/24px 24px;
+    border:6px solid var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <span class="medallion" aria-hidden="true"></span>
+  <div class="kicker">DAR MAKKAH · دار مكة</div>
+</header>
+<div class="wrap">
+  <section>
+    <h1>من السؤال<br>إلى السباق.</h1>
+    <p class="lead">أعدّ أسئلة القرآن مرة واحدة، وأطلقها منافسةً مباشرة برقم دخول أو ممارسةً ذاتية لطلابك.</p>
+    <div class="actions">
+      <button class="btn-primary">ابدأ كمعلّم</button>
+      <button class="btn-outline">أنا طالب</button>
+    </div>
+  </section>
+  <aside class="demo">
+    <div class="demo-label">JOIN A SESSION</div>
+    <div class="pin">7<span>4</span>1<span>9</span>2<span>8</span></div>
+    <p class="demo-note">ادخل الرقم من معلّمك، اختر اسمًا مستعارًا، وابدأ السباق.</p>
+    <div class="qr" aria-hidden="true"></div>
+  </aside>
+</div>
+</body>
+</html>

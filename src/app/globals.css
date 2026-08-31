@@ -3,21 +3,119 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #f8f4ec;
+  --foreground: #2a1f10;
+  --gold: #b0884b;
+  --gold-deep: #8a6b38;
+  --lapis: #23456b;
+  --red: #a33b2e;
+  --rule: #e6dccb;
+  --body-ink: #5c4a25;
+  --muted-ink: #6b5a36;
+  --wash: #efe4d4;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), "Thmanyah Sans", "Segoe UI", Tahoma, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), "Thmanyah Serif Display", "Times New Roman", serif;
+}
+
+.font-body-serif {
+  font-family: var(--font-text), "Thmanyah Serif Text", serif;
+}
+
+/* Manuscript medallion: the gold ornament marking a heading, as surah
+   headers are marked in mushaf margins. */
+.medallion {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid var(--gold);
+  box-shadow: inset 0 0 0 3px var(--background), inset 0 0 0 4.5px var(--gold);
+}
+
+/* Mashrabiya lattice band (girih): 8-point star lattice on the page edge.
+   Stacks to a horizontal band on mobile. */
+.lattice {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 62%, var(--background) 63%),
+    conic-gradient(from 22.5deg, var(--rule) 0 45deg, transparent 45deg 90deg) 0 0 / 44px 44px,
+    linear-gradient(var(--background), var(--background));
+}
+
+/* Octagonal join-code plate: the session code holder on the landing hero. */
+.octa {
+  border: 2px solid var(--gold);
+  outline: 1px solid var(--lapis);
+  outline-offset: 4px;
+  text-align: center;
+  background: var(--background);
+}
+
+/* The rewrite: ranked rows rise in, then keep their identity and slide
+   between scoreboards (FLIP transforms set from Scoreboard.tsx). */
+@keyframes sb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sb-enter {
+  animation: sb-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Question result flash: correct/wrong lands once, decelerated. */
+@keyframes result-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.result-in {
+  animation: result-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Streak spark: three bounded pulses while the marker is on screen. */
+@keyframes sb-spark {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.22);
+  }
+}
+.sb-spark {
+  animation: sb-spark 640ms ease-in-out 3;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-enter,
+  .result-in,
+  .sb-spark {
+    animation: none !important;
+  }
+  .sb-row {
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 @layer utilities {

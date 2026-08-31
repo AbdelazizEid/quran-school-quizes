@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>comp-c — المحراب</title>
+<style>
+  :root { --parchment:#f8f4ec; --ink:#2a1f10; --gold:#b0884b; --gold-deep:#8a6b38; --lapis:#23456b; --red:#a33b2e; --ink-body:#5c4a25; --ink-muted:#6b5a36; --rule:#e6dccb; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--parchment); color:var(--ink); font-family:"Thmanyah Sans","Segoe UI",Tahoma,sans-serif; min-height:100vh; padding:3rem 3rem 5rem; }
+  .wrap { max-width:64rem; margin:0 auto; text-align:center; }
+  .kicker { font-size:.72rem; letter-spacing:.35em; text-transform:uppercase; color:var(--gold-deep); direction:ltr; }
+  .mihrab { margin:2rem auto 0; width:min(30rem, 90%); position:relative; }
+  .mihrab svg { width:100%; height:auto; display:block; }
+  .mihrab-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:3.2rem 2rem 2rem; }
+  h1 { font-family:"Thmanyah Serif Display","Thmanyah Serif Text","Times New Roman",serif; font-size:clamp(2.2rem,5vw,3rem); line-height:1.35; font-weight:700; }
+  h1 .gild { color:var(--gold); }
+  .lead { margin-top:1rem; font-size:1.05rem; line-height:1.8; color:var(--ink-body); max-width:24rem; }
+  .btn-primary { margin-top:1.75rem; background:var(--ink); color:var(--parchment); padding:.95rem 2.2rem; font-size:1.05rem; font-weight:600; border:none; border-radius:2px; font-family:inherit; box-shadow:inset 0 0 0 3px var(--ink), inset 0 0 0 4px var(--gold); }
+  .arcade { margin-top:3.5rem; display:grid; grid-template-columns:repeat(3,1fr); gap:2rem; }
+  .arch { border:1.5px solid var(--gold); border-top:none; position:relative; padding:2.4rem 1.25rem 1.4rem; text-align:start; background:
+    radial-gradient(circle at 50% 0, transparent 0, var(--parchment) 0); }
+  .arch::before { content:""; position:absolute; top:-1px; right:8%; left:8%; height:2.6rem; border:1.5px solid var(--gold); border-bottom:none; border-radius:2.6rem 2.6rem 0 0; }
+  .arch h3 { font-size:.95rem; font-weight:700; color:var(--lapis); margin-bottom:.4rem; }
+  .arch p { font-size:.83rem; line-height:1.7; color:var(--ink-muted); }
+  .foot { margin-top:3.5rem; font-size:.75rem; letter-spacing:.3em; color:var(--red); direction:ltr; }
+  @media (max-width:640px) {
+    body { padding:2rem 1rem 3rem; }
+    .arcade { grid-template-columns:1fr; gap:1.4rem; }
+    .mihrab-inner { padding:2.4rem 1.25rem 1.5rem; }
+    h1 { font-size:2rem; }
+    .lead { font-size:.95rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">DAR MAKKAH — دار مكة</div>
+  <div class="mihrab">
+    <svg viewBox="0 0 480 420" aria-hidden="true">
+      <path d="M240 12 C150 12 88 78 88 168 L88 408 L392 408 L392 168 C392 78 330 12 240 12 Z" fill="none" stroke="#b0884b" stroke-width="2.5"/>
+      <path d="M240 26 C160 26 102 86 102 168 L102 396 L378 396 L378 168 C378 86 320 26 240 26 Z" fill="none" stroke="#23456b" stroke-width="1.2"/>
+      <path d="M240 40 C170 40 116 94 116 168 L116 384 L364 384 L364 168 C364 94 310 40 240 40 Z" fill="none" stroke="#a33b2e" stroke-width="0.8" stroke-dasharray="1 6" stroke-linecap="round"/>
+      <circle cx="240" cy="12" r="5" fill="#a33b2e"/>
+    </svg>
+    <div class="mihrab-inner">
+      <h1>ادخلْ <span class="gild">محرابَ</span><br>المسألة</h1>
+      <p class="lead">جلسات قرآنية حيّة: سؤالٌ يُعرض، جوابٌ يُسرع، ولوحةُ شرفٍ تُعلَّق في نهاية الدرس.</p>
+      <button class="btn-primary">ابدأ الجلسة</button>
+    </div>
+  </div>
+  <div class="arcade">
+    <div class="arch"><h3>للمعلّم</h3><p>بنك أسئلة قابل للمشاركة، ونسخٌ مستقلّة بين المعلمين.</p></div>
+    <div class="arch"><h3>للطالب</h3><p>دخولٌ برقم الجلسة والاسم المستعار — دون حساب.</p></div>
+    <div class="arch"><h3>للممارسة</h3><p>حسابٌ يحفظ تقدّمك، وتصحيحٌ يدويٌّ لأسئلة الإجابة الحرة.</p></div>
+  </div>
+  <div class="foot">QURAN · QUIZ · COMPETE</div>
+</div>
+</body>
+</html>

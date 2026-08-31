@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-30T14:30:00Z",
+  "title": "Design System: Dar Makkah",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "primary", "displayName": "Ink", "canonical": "#2a1f10", "tonalRamp": ["#120c05", "#1f150a", "#2a1f10", "#453417", "#6b5a36", "#8f7c52", "#b3a37e", "#d8cdb2"] },
+      "gold": { "role": "secondary", "displayName": "Gold", "canonical": "#b0884b", "tonalRamp": ["#4d3a1b", "#6b5129", "#8a6b38", "#b0884b", "#c6a266", "#d7b985", "#e6d0a8", "#f2e6ca"] },
+      "parchment": { "role": "neutral", "displayName": "Parchment", "canonical": "#f8f4ec", "tonalRamp": ["#2a251c", "#57503f", "#857b64", "#b3a88c", "#d6cbb0", "#e9e1ce", "#f2ecdd", "#f8f4ec"] },
+      "rule": { "role": "neutral", "displayName": "Rule", "canonical": "#e6dccb", "tonalRamp": ["#3d362a", "#6a6150", "#948a74", "#bdb194", "#d5c9ab", "#e6dccb", "#efe6d5", "#f6f0e3"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles only. One per page." },
+      "body": { "displayName": "Body", "purpose": "Lead paragraphs and main reading." },
+      "label": { "displayName": "Label", "purpose": "Gold kickers above titles." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "state-fill", "value": "background-color 120ms ease-out", "purpose": "Hover fill change on buttons; the only motion." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Inked stamp: the main action of a page.",
+      "html": "<button class=\"ds-btn-primary\" dir=\"rtl\">مكتبة الأسئلة</button>",
+      "css": ".ds-btn-primary { background: #2a1f10; color: #f8f4ec; padding: 16px 32px; font-size: 1.125rem; font-weight: 600; font-family: 'Thmanyah Sans', 'Segoe UI', Tahoma, sans-serif; border: none; border-radius: 12px; cursor: pointer; transition: background-color 120ms ease-out; } .ds-btn-primary:hover { background: #1f150a; } .ds-btn-primary:focus-visible { outline: 2px solid #b0884b; outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action: gold-ruled, transparent ground.",
+      "html": "<button class=\"ds-btn-outline\" dir=\"rtl\">انضمّ بمنافسة</button>",
+      "css": ".ds-btn-outline { background: transparent; color: #2a1f10; padding: 16px 32px; font-size: 1.125rem; font-weight: 600; font-family: 'Thmanyah Sans', 'Segoe UI', Tahoma, sans-serif; border: 1px solid #b0884b; border-radius: 12px; cursor: pointer; transition: background-color 120ms ease-out; } .ds-btn-outline:hover { background: #efe4d4; } .ds-btn-outline:focus-visible { outline: 2px solid #b0884b; outline-offset: 2px; }"
+    },
+    {
+      "name": "Kicker Label",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Gold uppercase Latin kicker with Arabic companion under it.",
+      "html": "<div class=\"ds-kicker\" dir=\"rtl\"><p class=\"ds-kicker-latin\">DAR MAKKAH</p><p class=\"ds-kicker-ar\">دار مكة</p></div>",
+      "css": ".ds-kicker { display: flex; flex-direction: column; gap: 4px; } .ds-kicker-latin { font-family: 'Thmanyah Sans', 'Segoe UI', Tahoma, sans-serif; font-size: 0.75rem; letter-spacing: 0.3em; text-transform: uppercase; color: #b0884b; margin: 0; direction: ltr; text-align: right; } .ds-kicker-ar { font-family: 'Thmanyah Sans', 'Segoe UI', Tahoma, sans-serif; font-size: 0.875rem; color: #5c4a25; margin: 0; }"
+    },
+    {
+      "name": "Medallion",
+      "kind": "custom",
+      "refersTo": "medallion",
+      "description": "Signature ornament: 14px double gold ring marking a page header.",
+      "html": "<span class=\"ds-medallion\" aria-hidden=\"true\"></span>",
+      "css": ".ds-medallion { display: inline-block; width: 14px; height: 14px; border-radius: 9999px; border: 2px solid #b0884b; box-shadow: inset 0 0 0 3px #f8f4ec, inset 0 0 0 4.5px #b0884b; }"
+    },
+    {
+      "name": "Margin Notes",
+      "kind": "custom",
+      "refersTo": "margin-notes",
+      "description": "Start-ruled annotation column for supporting notes.",
+      "html": "<div class=\"ds-margin-notes\" dir=\"rtl\"><p>للمعلّمين: أنشئ أسئلك، أطلق جلسة، شارِك الرقم.</p></div>",
+      "css": ".ds-margin-notes { display: flex; flex-direction: column; gap: 16px; border-inline-start: 1px solid #e6dccb; padding-inline-start: 24px; } .ds-margin-notes p { font-family: 'Thmanyah Sans', 'Segoe UI', Tahoma, sans-serif; font-size: 0.875rem; color: #6b5a36; margin: 0; line-height: 1.6; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Teacher's Board",
+    "overview": "The system reads like a Quran school teacher's board: a warm parchment surface where structure comes from ruled lines rather than boxes, hierarchy comes from ink weight, and gold appears rarely, only to mark what matters. The interface is calm and legible first; a teacher mid-lesson and a student on a phone should both parse it in one glance. The board is flat: no shadows, no floating cards; the only relief is the medallion's inset ring.",
+    "keyCharacteristics": [
+      "Parchment ground with dark ink type; no pure white, no pure black",
+      "Structure from hairline rules, never enclosing boxes",
+      "Gold reserved for markers (kickers, medallions, outline borders)",
+      "Flat surfaces; the medallion ring is the only relief",
+      "Thmanyah families: Serif Display for headings, Sans for UI (planned; system fallbacks until wired)"
+    ],
+    "rules": [
+      { "name": "The Gold Ration Rule", "body": "Gold covers ≤10% of any screen. Its rarity is what makes a gold mark read as important.", "section": "colors" },
+      { "name": "The Board Rule", "body": "Never a pure white or pure black. The lightest value is parchment, the darkest is ink deep.", "section": "colors" },
+      { "name": "The One Display Rule", "body": "Display type appears once per page; everything else is body scale.", "section": "typography" },
+      { "name": "The Flat Board Rule", "body": "Surfaces never lift. If a state needs emphasis, change the ink — never add a shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do structure with hairline start-rules instead of cards and boxes.",
+      "Do keep gold to markers and borders; under 10% of any screen.",
+      "Do use Thmanyah names in font stacks with the documented fallbacks.",
+      "Do anchor layouts to the RTL start edge."
+    ],
+    "donts": [
+      "Don't add drop shadows, glows, or floating cards.",
+      "Don't use pure white or pure black anywhere.",
+      "Don't introduce a second display heading size.",
+      "Don't let gold become a fill for large surfaces."
+    ]
+  }
+}

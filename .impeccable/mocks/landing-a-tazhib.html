@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>comp-a — التذهيب</title>
+<style>
+  :root { --parchment:#f8f4ec; --ink:#2a1f10; --gold:#b0884b; --gold-deep:#8a6b38; --lapis:#23456b; --red:#a33b2e; --ink-body:#5c4a25; --ink-muted:#6b5a36; --rule:#e6dccb; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--parchment); color:var(--ink); font-family:"Thmanyah Sans","Segoe UI",Tahoma,sans-serif; min-height:100vh; padding:2.5rem 3rem 5rem; }
+  .page { max-width:66rem; margin:0 auto; border:1px solid var(--gold); outline:3px double var(--red); outline-offset:5px; padding:3.5rem 3rem 3rem; position:relative; background:var(--parchment); }
+  .shamsa { position:absolute; top:-21px; right:50%; transform:translateX(50%); width:42px; height:42px; }
+  .headpiece { border-block:3px double var(--gold); padding:1.1rem 0; margin-bottom:3rem; display:flex; align-items:center; justify-content:center; gap:1.25rem; }
+  .headpiece .k { font-size:.72rem; letter-spacing:.35em; text-transform:uppercase; color:var(--gold-deep); direction:ltr; }
+  .headpiece .sep { color:var(--red); font-size:.8rem; }
+  h1 { font-family:"Thmanyah Serif Display","Thmanyah Serif Text","Times New Roman",serif; font-size:clamp(3rem,7vw,4.2rem); line-height:1.25; font-weight:700; text-align:center; }
+  h1 .gild { color:var(--gold); }
+  .basmala-rule { display:flex; align-items:center; gap:.9rem; justify-content:center; margin-top:1.5rem; }
+  .basmala-rule .line { height:1px; width:7rem; background:var(--red); }
+  .basmala-rule .dot { width:8px; height:8px; background:var(--lapis); transform:rotate(45deg); }
+  .lead { margin:2rem auto 0; max-width:34rem; text-align:center; font-size:1.2rem; line-height:1.8; color:var(--ink-body); }
+  .actions { margin-top:2.75rem; display:flex; gap:1.25rem; justify-content:center; flex-wrap:wrap; }
+  .btn-primary { background:var(--ink); color:var(--parchment); padding:1rem 2.2rem; font-size:1.1rem; font-weight:600; border:none; border-radius:2px; font-family:inherit; box-shadow:inset 0 0 0 1px var(--ink), inset 0 0 0 3px var(--parchment), inset 0 0 0 4px var(--gold); }
+  .btn-outline { background:transparent; color:var(--ink); padding:1rem 2.2rem; font-size:1.1rem; font-weight:600; border:1px solid var(--lapis); border-radius:2px; font-family:inherit; }
+  .cols { margin-top:3.25rem; display:grid; grid-template-columns:1fr 1fr; gap:2.5rem; border-top:1px solid var(--rule); padding-top:2rem; }
+  .col h3 { font-size:.95rem; font-weight:700; color:var(--red); margin-bottom:.5rem; }
+  .col p { font-size:.875rem; line-height:1.7; color:var(--ink-muted); }
+  @media (max-width:640px) {
+    body { padding:1.5rem 1rem 3rem; }
+    .page { padding:2.5rem 1.25rem 2rem; }
+    .cols { grid-template-columns:1fr; gap:1.5rem; }
+    h1 { font-size:2.4rem; }
+    .actions { flex-direction:column; align-items:stretch; }
+    .btn-primary,.btn-outline { width:100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <svg class="shamsa" viewBox="0 0 42 42" aria-hidden="true">
+    <circle cx="21" cy="21" r="13" fill="none" stroke="#a33b2e" stroke-width="1.5"/>
+    <circle cx="21" cy="21" r="8" fill="none" stroke="#b0884b" stroke-width="1.5"/>
+    <circle cx="21" cy="21" r="3" fill="#b0884b"/>
+    <g stroke="#23456b" stroke-width="1">
+      <line x1="21" y1="2" x2="21" y2="40"/><line x1="2" y1="21" x2="40" y2="21"/>
+      <line x1="7.6" y1="7.6" x2="34.4" y2="34.4"/><line x1="34.4" y1="7.6" x2="7.6" y2="34.4"/>
+    </g>
+  </svg>
+  <div class="headpiece">
+    <span class="k">DAR MAKKAH</span>
+    <span class="sep">❖</span>
+    <span class="k" style="letter-spacing:.15em">دار مكة لتحفيظ القرآن</span>
+  </div>
+  <h1>سبورةٌ مضيَّةٌ<br>لكلِّ <span class="gild">آيةٍ وسؤال</span></h1>
+  <div class="basmala-rule" aria-hidden="true">
+    <span class="line"></span><span class="dot"></span><span class="line"></span>
+  </div>
+  <p class="lead">أعدّ أسئلة السور والتجويد والمعاني، وأطلقها منافسةً مباشرة أو ممارسةً ذاتية — على سُنّة المخطوط: ذهبٌ، حبرٌ، ورتبة.</p>
+  <div class="actions">
+    <button class="btn-primary">مكتبة الأسئلة</button>
+    <button class="btn-outline">انضمّ بمنافسة</button>
+  </div>
+  <div class="cols">
+    <div class="col">
+      <h3>للمعلّم</h3>
+      <p>أنشئ الاختبارات، شارِك رقم الجلسة أو رمزها، وتابع لوحة النتائج لحظةً بلحظة.</p>
+    </div>
+    <div class="col">
+      <h3>للطالب</h3>
+      <p>ادخل بالاسم المستعار للمنافسة، أو بحسابك للممارسة، واحفظ نتائجك لتعقب التقدم.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

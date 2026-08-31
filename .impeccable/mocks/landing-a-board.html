@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>comp-a — السبورة الافتتاحية</title>
+<style>
+  :root { --parchment:#f8f4ec; --ink:#2a1f10; --ink-deep:#1f150a; --gold:#b0884b; --ink-body:#5c4a25; --ink-muted:#6b5a36; --rule:#e6dccb; --wash:#efe4d4; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--parchment); color:var(--ink); font-family:"Thmanyah Sans","Segoe UI",Tahoma,sans-serif; min-height:100vh; padding:4rem 3rem 6rem; }
+  .wrap { max-width:72rem; margin:0 auto; }
+  header { display:flex; align-items:center; gap:1rem; margin-bottom:3rem; }
+  .medallion { display:inline-block; width:14px; height:14px; border-radius:9999px; border:2px solid var(--gold); box-shadow: inset 0 0 0 3px var(--parchment), inset 0 0 0 4.5px var(--gold); }
+  .kicker { font-size:.75rem; letter-spacing:.3em; text-transform:uppercase; color:var(--gold); direction:ltr; }
+  .brand-ar { font-size:.875rem; color:var(--ink-body); }
+  h1 { font-family:"Thmanyah Serif Display","Thmanyah Serif Text","Times New Roman",serif; font-size:clamp(3.5rem,8vw,4.5rem); line-height:1.15; font-weight:700; }
+  .lead { margin-top:1.5rem; max-width:36rem; font-size:1.25rem; line-height:1.7; color:var(--ink-body); }
+  .actions { margin-top:3rem; display:flex; gap:1.5rem; flex-wrap:wrap; }
+  .btn-primary { background:var(--ink); color:var(--parchment); padding:1rem 2rem; font-size:1.125rem; font-weight:600; border:none; border-radius:12px; cursor:pointer; font-family:inherit; }
+  .btn-primary:hover { background:var(--ink-deep); }
+  .btn-outline { background:transparent; color:var(--ink); padding:1rem 2rem; font-size:1.125rem; font-weight:600; border:1px solid var(--gold); border-radius:12px; cursor:pointer; font-family:inherit; }
+  .btn-outline:hover { background:var(--wash); }
+  .notes { margin-top:4rem; border-inline-start:1px solid var(--rule); padding-inline-start:1.5rem; display:flex; flex-direction:column; gap:1rem; max-width:34rem; }
+  .notes p { font-size:.875rem; line-height:1.6; color:var(--ink-muted); }
+  .foot { margin-top:6rem; font-size:.75rem; color:var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="medallion" aria-hidden="true"></span>
+    <div>
+      <div class="kicker">DAR MAKKAH</div>
+      <div class="brand-ar">دار مكة — أسئلة القرآن</div>
+    </div>
+  </header>
+  <h1>سبورة المعلّم،<br>وحماس المسابقة.</h1>
+  <p class="lead">منصة مدرسية لإعداد أسئلة القرآن وتشغيلها كمسابقات مباشرة أو كممارسة ذاتية — من التلقين إلى التفاعل.</p>
+  <div class="actions">
+    <button class="btn-primary">مكتبة الأسئلة</button>
+    <button class="btn-outline">انضمّ بمنافسة</button>
+  </div>
+  <div class="notes">
+    <p>للمعلّمين: أنشئ أسئلة السور والآيات والتجويد، أطلق جلسة، شارِك الرقم، وتابِع لوحة النتائج مباشرة.</p>
+    <p>للطلاب: انضمّ بالرمز والاسم المستعار للمنافسة، أو بحسابك للممارسة الذاتية.</p>
+  </div>
+  <div class="foot">دار مكة · منصة الأسئلة القرآنية</div>
+</div>
+</body>
+</html>

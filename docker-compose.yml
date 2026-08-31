@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: darmakkah-db
+    environment:
+      POSTGRES_USER: darmakkah
+      POSTGRES_PASSWORD: darmakkah
+      POSTGRES_DB: darmakkah
+    ports:
+      - "5434:5432"
+    volumes:
+      - darmakkah-pgdata:/var/lib/postgresql/data
+
+volumes:
+  darmakkah-pgdata:
