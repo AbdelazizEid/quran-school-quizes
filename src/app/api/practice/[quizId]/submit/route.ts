@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getStudent } from "@/lib/student";
 
-export async function POST(req: NextRequest, { params }: { params: { quizId: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
+  const { quizId } = await params;
   const student = await getStudent();
   if (!student) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const studentId = student.id;
 
   const quiz = await prisma.quiz.findUnique({
-    where: { id: params.quizId },
+    where: { id: quizId },
     include: { questions: { include: { options: true }, orderBy: { order: "asc" } } },
   });
   if (!quiz) return NextResponse.json({ error: "not-found" }, { status: 404 });

@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTeacher } from "@/lib/teacher";
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const teacher = await getTeacher();
   if (!teacher) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const source = await prisma.quiz.findFirst({
-    where: { id: params.id },
+    where: { id },
     include: { questions: { include: { options: true }, orderBy: { order: "asc" } } },
   });
   if (!source) return NextResponse.json({ error: "not-found" }, { status: 404 });

@@ -36,7 +36,7 @@
       "kind": "button",
       "refersTo": "button-outline",
       "description": "Secondary action: gold-ruled, transparent ground.",
-      "html": "<button class=\"ds-btn-outline\" dir=\"rtl\">انضمّ بمنافسة</button>",
+      "html": "<button class=\"ds-btn-outline\" dir=\"rtl\">انضمّ بمسابقة</button>",
       "css": ".ds-btn-outline { background: transparent; color: #2a1f10; padding: 16px 32px; font-size: 1.125rem; font-weight: 600; font-family: 'Thmanyah Sans', 'Segoe UI', Tahoma, sans-serif; border: 1px solid #b0884b; border-radius: 12px; cursor: pointer; transition: background-color 120ms ease-out; } .ds-btn-outline:hover { background: #efe4d4; } .ds-btn-outline:focus-visible { outline: 2px solid #b0884b; outline-offset: 2px; }"
     },
     {

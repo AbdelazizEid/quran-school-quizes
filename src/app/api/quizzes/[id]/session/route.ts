@@ -3,12 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getTeacher } from "@/lib/teacher";
 import { createCompetitionSession } from "@/lib/session";
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const teacher = await getTeacher();
   if (!teacher) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const quiz = await prisma.quiz.findFirst({
-    where: { id: params.id, authorId: teacher.id },
+    where: { id, authorId: teacher.id },
     include: { _count: { select: { questions: true } } },
   });
   if (!quiz) return NextResponse.json({ error: "not-found" }, { status: 404 });

@@ -122,6 +122,12 @@ export async function submitAnswer(
   const question = session.quiz.questions[session.currentQuestionIndex];
   if (!question) return { accepted: false, correct: false, points: 0, bonus: 0, streak: 0 };
 
+  // enforce the question time limit server-side (1.5s grace for latency/clock skew)
+  const elapsedMs = Date.now() - session.questionStartedAt.getTime();
+  if (elapsedMs > question.timeLimitSec * 1000 + 1500) {
+    return { accepted: false, correct: false, points: 0, bonus: 0, streak: 0 };
+  }
+
   const already = await prisma.sessionAnswer.findFirst({
     where: { sessionId, participantId, questionId: question.id },
   });

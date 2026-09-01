@@ -51,15 +51,6 @@ h3 {
     linear-gradient(var(--background), var(--background));
 }
 
-/* Octagonal join-code plate: the session code holder on the landing hero. */
-.octa {
-  border: 2px solid var(--gold);
-  outline: 1px solid var(--lapis);
-  outline-offset: 4px;
-  text-align: center;
-  background: var(--background);
-}
-
 /* The rewrite: ranked rows rise in, then keep their identity and slide
    between scoreboards (FLIP transforms set from Scoreboard.tsx). */
 @keyframes sb-rise {

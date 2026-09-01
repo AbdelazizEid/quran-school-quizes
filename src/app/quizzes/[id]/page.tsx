@@ -145,7 +145,7 @@ export default function QuizEditorPage() {
               >
                 <option value="MCQ">اختيار من متعدد</option>
                 <option value="TRUE_FALSE">صح / خطأ</option>
-                <option value="INPUT">إجابة حرة (ممارسة فقط)</option>
+                <option value="INPUT">إجابة حرة (للاختبار فقط)</option>
               </select>
               <label className="flex items-center gap-2 text-sm">
                 <span>الوقت (ث)</span>
@@ -215,7 +215,7 @@ export default function QuizEditorPage() {
           )}
           {q.kind === "INPUT" && (
             <p className="mt-4 text-sm text-[color:var(--muted-ink)]">
-              تُصحَّح الإجابات الحرة يدويًا من المعلّم بعد الممارسة.
+              تُصحَّح الإجابات الحرة يدويًا من المعلّم بعد الاختبار.
             </p>
           )}
         </section>

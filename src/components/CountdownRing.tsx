@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const TICK_HREF = "/sounds/tick.wav";
+const TICK_FROM_SEC = 5; // tick during the final seconds…
+const TICK_URGENT_SEC = 3; // …and speed the tick up when the ring turns red
 
 export default function CountdownRing({
   startedAt,
@@ -8,26 +12,89 @@ export default function CountdownRing({
   size = 72,
   tone = "lapis",
   minSizeText = "text-2xl",
+  sound = false,
+  onEnd,
 }: {
   startedAt: number;
   durationMs: number;
   size?: number;
   tone?: "lapis" | "gold" | "ink";
   minSizeText?: string;
+  sound?: boolean;
+  onEnd?: () => void;
 }) {
   const [remaining, setRemaining] = useState(() =>
     Math.max(0, durationMs - (Date.now() - startedAt))
   );
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastSecRef = useRef<number | null>(null);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
+  const endedRef = useRef(false);
+
+  // browsers block audio until a gesture happened in the page —
+  // prime the element on the first pointerdown, silently
   useEffect(() => {
-    setRemaining(Math.max(0, durationMs - (Date.now() - startedAt)));
+    if (!sound) return;
+    if (!audioRef.current) {
+      audioRef.current = new Audio(TICK_HREF);
+      audioRef.current.preload = "auto";
+    }
+    const audio = audioRef.current;
+    const unlock = () => {
+      audio
+        .play()
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+        })
+        .catch(() => undefined);
+      window.removeEventListener("pointerdown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock);
+    return () => window.removeEventListener("pointerdown", unlock);
+  }, [sound]);
+
+  useEffect(() => {
+    // countdown tick: one per second in the final stretch, faster once urgent
+    const tickFor = (left: number) => {
+      const sec = Math.ceil(left / 1000);
+      const last = lastSecRef.current;
+      lastSecRef.current = sec;
+      const audio = audioRef.current;
+      if (!sound || !audio || last === null || sec >= last || sec < 1 || sec > TICK_FROM_SEC) {
+        return;
+      }
+      audio.playbackRate = sec <= TICK_URGENT_SEC ? 1.45 : 1;
+      audio.currentTime = 0;
+      audio.play().catch(() => undefined);
+    };
+
+    // re-seed the ref so a new question never compares against the old one
+    lastSecRef.current = null;
+    endedRef.current = false;
+    const left0 = Math.max(0, durationMs - (Date.now() - startedAt));
+    setRemaining(left0);
+    tickFor(left0);
+    if (left0 <= 0) {
+      endedRef.current = true;
+      onEndRef.current?.();
+    }
     const iv = setInterval(() => {
       const left = Math.max(0, durationMs - (Date.now() - startedAt));
       setRemaining(left);
-      if (left <= 0) clearInterval(iv);
+      tickFor(left);
+      if (left <= 0) {
+        clearInterval(iv);
+        if (!endedRef.current) {
+          endedRef.current = true;
+          onEndRef.current?.();
+        }
+      }
     }, 100);
     return () => clearInterval(iv);
-  }, [startedAt, durationMs]);
+  }, [startedAt, durationMs, sound]);
 
   const r = size / 2 - 5;
   const c = 2 * Math.PI * r;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTeacher } from "@/lib/teacher";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 async function ownedQuiz(id: string) {
   const teacher = await getTeacher();
@@ -16,13 +16,15 @@ async function ownedQuiz(id: string) {
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const owned = await ownedQuiz(params.id);
+  const { id } = await params;
+  const owned = await ownedQuiz(id);
   if (!owned) return NextResponse.json({ error: "not-found" }, { status: 404 });
   return NextResponse.json({ quiz: owned.quiz });
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  const owned = await ownedQuiz(params.id);
+  const { id } = await params;
+  const owned = await ownedQuiz(id);
   if (!owned) return NextResponse.json({ error: "not-found" }, { status: 404 });
 
   const body = (await req.json()) as {
@@ -39,19 +41,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const quiz = await prisma.$transaction(async (tx) => {
     await tx.quiz.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title: body.title?.trim() ?? undefined,
         description: body.description?.trim() ?? undefined,
       },
     });
     if (body.questions) {
-      await tx.question.deleteMany({ where: { quizId: params.id } });
+      await tx.question.deleteMany({ where: { quizId: id } });
       for (let i = 0; i < body.questions.length; i++) {
         const q = body.questions[i];
         await tx.question.create({
           data: {
-            quizId: params.id,
+            quizId: id,
             kind: q.kind,
             text: q.text,
             timeLimitSec: q.timeLimitSec ?? 20,
@@ -73,7 +75,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       }
     }
     return tx.quiz.findUniqueOrThrow({
-      where: { id: params.id },
+      where: { id },
       include: { questions: { include: { options: true }, orderBy: { order: "asc" } } },
     });
   });
@@ -82,8 +84,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const owned = await ownedQuiz(params.id);
+  const { id } = await params;
+  const owned = await ownedQuiz(id);
   if (!owned) return NextResponse.json({ error: "not-found" }, { status: 404 });
-  await prisma.quiz.delete({ where: { id: params.id } });
+  await prisma.$transaction([
+    // sessions reference the quiz without cascade — drop them first
+    // (participants and answers cascade from the session)
+    prisma.session.deleteMany({ where: { quizId: id } }),
+    prisma.quiz.delete({ where: { id } }),
+  ]);
   return NextResponse.json({ ok: true });
 }

@@ -4,6 +4,8 @@ A Kahoot-style web application for a Quran school. Teachers build question sets 
 
 ## Language
 
+**Arabic UI terms**: The interface displays Competition as **مسابقة** and Practice as **اختبار**. Internal code names such as `Competition` and `Practice` remain unchanged.
+
 **Question**:
 A single item in a Quiz. Three kinds are supported: Multiple Choice (up to 4 options, exactly one correct), True/False, and Input (free-text response). Competitions use only Multiple Choice and True/False; Practice can use all three.
 _Avoid_: item, prompt

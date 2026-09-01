@@ -6,7 +6,7 @@ test("full live competition: host starts, student joins by code and answers", as
 
   await page.goto("/quizzes");
   await page.getByRole("link", { name: "اختبار جديد" }).click();
-  const quizTitle = `منافسة ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const quizTitle = `مسابقة ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   await page.getByPlaceholder("عنوان الاختبار — مثال: سورة الفاتحة").fill(quizTitle);
   await page.getByPlaceholder("نص السؤال").fill("سورة الفاتحة عدد آياتها؟");
   await page.getByPlaceholder("الخيار 1").fill("سبع");
@@ -16,7 +16,7 @@ test("full live competition: host starts, student joins by code and answers", as
 
   const quizRow = page.locator("li", { hasText: quizTitle });
   await expect(quizRow).toBeVisible({ timeout: 10000 });
-  await quizRow.getByRole("button", { name: "ابدأ منافسة" }).click();
+  await quizRow.getByRole("button", { name: "ابدأ مسابقة" }).click();
 
   await expect(page.getByText("رقم الجلسة")).toBeVisible({ timeout: 30000 });
   const joinCode = ((await page.locator("p.text-4xl").first().textContent()) ?? "").trim();

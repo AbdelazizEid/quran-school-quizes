@@ -1,22 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, use } from "react";
 import { io, type Socket } from "socket.io-client";
 import QRCode from "qrcode";
 import type { SessionState } from "@/lib/session-state";
-import { REVIEW_MS, SCOREBOARD_MS, phaseMs } from "@/lib/timing";
 import CountdownRing from "@/components/CountdownRing";
 import Scoreboard from "@/components/Scoreboard";
 import Podium from "@/components/Podium";
+import VoteBar from "@/components/VoteBar";
 
-export default function HostPage({ params }: { params: { sessionId: string } }) {
-  const { sessionId } = params;
+export default function HostPage({ params }: { params: Promise<{ sessionId: string }> }) {
+  const { sessionId } = use(params);
   const [state, setState] = useState<SessionState | null>(null);
   const [connected, setConnected] = useState(false);
   const [answeredCount, setAnsweredCount] = useState(0);
   const socketRef = useRef<Socket | null>(null);
-  const nextTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qrRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -39,30 +38,7 @@ export default function HostPage({ params }: { params: { sessionId: string } }) 
     socketRef.current?.emit(event);
   };
 
-  const goNext = () => {
-    if (nextTimer.current) clearTimeout(nextTimer.current);
-    nextTimer.current = null;
-    hostEmit("next");
-  };
-
   const isLast = state ? state.questionIndex + 1 >= state.questionCount : false;
-
-  // auto-advance: review → scoreboard → next question (never past the final podium)
-  useEffect(() => {
-    if (!state) return;
-    let ms = 0;
-    if (state.phase === "ANSWER_REVIEW") ms = phaseMs(REVIEW_MS);
-    else if (state.phase === "LEADERBOARD" && !isLast) ms = phaseMs(SCOREBOARD_MS);
-    else return;
-    const started = state.phaseStartedAt ?? Date.now();
-    const remaining = Math.max(120, ms - (Date.now() - started) + 80);
-    nextTimer.current = setTimeout(goNext, remaining);
-    return () => {
-      if (nextTimer.current) clearTimeout(nextTimer.current);
-      nextTimer.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.phase, state?.phaseStartedAt, isLast]);
 
   useEffect(() => {
     if (!state?.joinCode || !qrRef.current) return;
@@ -80,9 +56,6 @@ export default function HostPage({ params }: { params: { sessionId: string } }) 
   }
 
   const roster = state.roster ?? [];
-  const ring = (ms: number, tone: "lapis" | "gold" = "lapis") => (
-    <CountdownRing startedAt={state.phaseStartedAt} durationMs={ms} tone={tone} />
-  );
 
   return (
     <main className="min-h-screen px-6 py-10 max-w-5xl mx-auto" dir="rtl">
@@ -136,6 +109,7 @@ export default function HostPage({ params }: { params: { sessionId: string } }) 
               durationMs={state.question.timeLimitSec * 1000}
               size={96}
               minSizeText="text-3xl"
+              sound
             />
             <p className="text-[color:var(--muted-ink)]">
               سؤال {state.questionIndex + 1} / {state.questionCount}
@@ -147,7 +121,7 @@ export default function HostPage({ params }: { params: { sessionId: string } }) 
           </div>
           <h2 className="mt-8 text-2xl md:text-3xl font-bold leading-relaxed">{state.question.text}</h2>
           <div className="mt-10">
-            <HostBtn onClick={() => hostEmit("reveal")} disabled={answeredCount === 0 && roster.length > 0}>
+            <HostBtn onClick={() => hostEmit("reveal")} disabled={!connected}>
               اكشف الإجابة
             </HostBtn>
           </div>
@@ -160,39 +134,34 @@ export default function HostPage({ params }: { params: { sessionId: string } }) 
             <p className="text-sm text-[color:var(--muted-ink)]">
               سؤال {state.questionIndex + 1} / {state.questionCount}
             </p>
-            {ring(phaseMs(REVIEW_MS))}
+            <p className="text-sm text-[color:var(--muted-ink)]" dir="ltr">
+              {state.answers?.total ?? 0} / {roster.length}
+            </p>
           </div>
           <h2 className="mt-4 text-center text-xl md:text-2xl font-bold leading-relaxed">
             {state.question.text}
           </h2>
           <div className="mt-6 grid sm:grid-cols-2 gap-3">
-            {state.question.options.map((o) => {
-              const count = state.answers?.counts?.[o.id] ?? 0;
-              const pct = state.answers?.total ? Math.round((count / state.answers.total) * 100) : 0;
-              return (
-                <div
-                  key={o.id}
-                  className={`px-4 py-3 text-center border rounded-sm overflow-hidden ${
-                    o.isCorrect
-                      ? "border-[color:var(--gold)] bg-[color:var(--wash)] font-bold"
-                      : "border-[color:var(--rule)] opacity-70"
-                  }`}
-                >
-                  <div
-                    className="h-1 bg-[color:var(--gold)] mx-auto mb-2"
-                    style={{ width: `${pct}%`, transition: "width 600ms cubic-bezier(0.16, 1, 0.3, 1)" }}
-                    aria-hidden="true"
-                  />
-                  {o.text}
-                  <span className="ms-2 text-sm text-[color:var(--muted-ink)] tabular-nums" dir="ltr">
-                    {count}
-                  </span>
-                </div>
-              );
-            })}
+            {state.question.options.map((o) => (
+              <div
+                key={o.id}
+                className={`px-4 py-3 text-center border rounded-sm ${
+                  o.isCorrect
+                    ? "border-[color:var(--gold)] bg-[color:var(--wash)] font-bold"
+                    : "border-[color:var(--rule)] opacity-70"
+                }`}
+              >
+                {o.text}
+                <VoteBar
+                  count={state.answers?.counts?.[o.id] ?? 0}
+                  total={state.answers?.total ?? 0}
+                  correct={o.isCorrect}
+                />
+              </div>
+            ))}
           </div>
           <div className="mt-10 text-center">
-            <HostBtn onClick={goNext}>{isLast ? "اعرض لوحة النتائج" : "التالي"}</HostBtn>
+            <HostBtn onClick={() => hostEmit("next")}>{isLast ? "اعرض لوحة النتائج" : "التالي"}</HostBtn>
           </div>
         </section>
       )}
@@ -201,11 +170,10 @@ export default function HostPage({ params }: { params: { sessionId: string } }) 
         <section className="mt-12">
           <div className="flex items-center justify-between max-w-xl mx-auto">
             <h2 className="text-lg font-semibold">الترتيب بعد السؤال {state.questionIndex + 1}</h2>
-            {ring(phaseMs(SCOREBOARD_MS), "gold")}
           </div>
           <div className="mt-6" />
           <div className="mt-10 text-center">
-            <HostBtn onClick={goNext}>السؤال التالي</HostBtn>
+            <HostBtn onClick={() => hostEmit("next")}>السؤال التالي</HostBtn>
           </div>
         </section>
       )}

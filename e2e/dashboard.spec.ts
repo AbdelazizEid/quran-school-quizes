@@ -36,12 +36,12 @@ test("quiz copy creates a detached duplicate", async ({ page }) => {
 
 test("landing renders RTL with no overflow, header user and teacher stats", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading").first()).toContainText("أسئلة القرآن");
+  await expect(page.getByRole("heading").first()).toContainText(/اختبارات قرآنية|أسئلة القرآن/);
   // dev mode: the signed-out visitor is the dev teacher
   await expect(page.getByText("مدرّس تجريبي").first()).toBeVisible();
   await expect(page.getByLabel("الإحصائيات")).toBeVisible();
   await expect(page.getByText("مجموعات الأسئلة")).toBeVisible();
-  await expect(page.getByText("جلسات المنافسة")).toBeVisible();
+  await expect(page.getByText("جلسات المسابقات")).toBeVisible();
   expect(await page.getAttribute("html", "dir")).toBe("rtl");
   await expectNoHorizontalOverflow(page);
 });

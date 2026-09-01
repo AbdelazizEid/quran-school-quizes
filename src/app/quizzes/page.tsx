@@ -95,13 +95,13 @@ export default function QuizzesPage() {
                 disabled={q._count.questions === 0 || starting === q.id}
                 className="bg-[color:var(--foreground)] text-[color:var(--background)] px-5 py-2.5 rounded-sm font-semibold disabled:opacity-40"
               >
-                {starting === q.id ? "…" : "ابدأ منافسة"}
+                {starting === q.id ? "…" : "ابدأ مسابقة"}
               </button>
               <Link
                 href={`/practice/${q.id}`}
                 className="border border-[color:var(--lapis)] px-5 py-2.5 rounded-sm font-semibold"
               >
-                ممارسة
+                اختبار
               </Link>
               <Link
                 href={`/quizzes/${q.id}`}

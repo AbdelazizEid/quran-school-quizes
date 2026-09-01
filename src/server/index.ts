@@ -11,7 +11,7 @@ const host = process.env.HOST ?? "0.0.0.0";
 const port = Number(process.env.PORT ?? 3000);
 
 async function start() {
-  const app = next({ dev });
+  const app = next({ dev, turbopack: true });
   const handler = app.getRequestHandler();
   await app.prepare();
 

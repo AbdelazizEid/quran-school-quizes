@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 
 type Question = {
   id: string;
@@ -10,8 +10,8 @@ type Question = {
   options: { id: string; text: string; isCorrect?: boolean }[];
 };
 
-export default function PracticePage({ params }: { params: { quizId: string } }) {
-  const { quizId } = params;
+export default function PracticePage({ params }: { params: Promise<{ quizId: string }> }) {
+  const { quizId } = use(params);
   const [title, setTitle] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, { optionId?: string; text?: string }>>({});
@@ -54,10 +54,10 @@ export default function PracticePage({ params }: { params: { quizId: string } })
   return (
     <main className="min-h-screen px-6 py-10 max-w-2xl mx-auto">
       <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--gold-deep)]" dir="ltr">
-        PRACTICE
+        اختبار
       </p>
       <h1 className="mt-2 text-3xl font-bold">{title}</h1>
-      <p className="mt-2 text-[color:var(--muted-ink)]">ممارسة ذاتية — أجب ثم أرسل.</p>
+      <p className="mt-2 text-[color:var(--muted-ink)]">اختبار ذاتي — أجب ثم أرسل.</p>
 
       {questions.map((q, qi) => (
         <section key={q.id} className="mt-8 border border-[color:var(--rule)] rounded-sm p-6">

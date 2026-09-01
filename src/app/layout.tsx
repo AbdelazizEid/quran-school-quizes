@@ -1,6 +1,9 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import { arSA } from "@clerk/localizations";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import SiteHeader from "@/components/SiteHeader";
+import { clerkEnabled } from "@/lib/teacher";
 import "./globals.css";
 
 const thmanyahSans = localFont({
@@ -47,16 +50,25 @@ export const metadata: Metadata = {
   description: "منصة اختبارات ومسابقات قرآنية",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const clerkOn = clerkEnabled();
+  let signedIn = false;
+  if (clerkOn) {
+    const { auth } = await import("@clerk/nextjs/server");
+    signedIn = Boolean((await auth()).userId);
+  }
+
   return (
     <html lang="ar" dir="rtl">
       <body className={`${thmanyahSans.variable} ${thmanyahSerifDisplay.variable} ${thmanyahSerifText.variable} antialiased`}>
-        <SiteHeader />
-        {children}
+        <ClerkProvider localization={arSA}>
+          <SiteHeader clerkOn={clerkOn} signedIn={signedIn} />
+          {children}
+        </ClerkProvider>
       </body>
     </html>
   );

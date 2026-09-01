@@ -12,7 +12,7 @@ export async function getStudent(): Promise<{ id: string; name: string } | null>
     return { id: dev.id, name: dev.name };
   }
   const { auth } = await import("@clerk/nextjs/server");
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return null;
   const student = await prisma.student.upsert({
     where: { clerkId: userId },

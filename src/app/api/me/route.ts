@@ -15,7 +15,7 @@ export async function GET() {
   }
 
   const { auth } = await import("@clerk/nextjs/server");
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return NextResponse.json({ role: "guest" });
 
   const student = await prisma.student.findUnique({ where: { clerkId: userId } });

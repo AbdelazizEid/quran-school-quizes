@@ -1,25 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, use } from "react";
 import { io, type Socket } from "socket.io-client";
 import { motion } from "framer-motion";
 import type { SessionState } from "@/lib/session-state";
-import { REVIEW_MS, SCOREBOARD_MS, phaseMs } from "@/lib/timing";
 import CountdownRing from "@/components/CountdownRing";
 import Scoreboard from "@/components/Scoreboard";
 import Podium from "@/components/Podium";
+import VoteBar from "@/components/VoteBar";
 
 type JoinResult = { ok: boolean; participantId?: string; nickname?: string; error?: string };
 type AnswerResult = { ok: boolean; correct?: boolean; points?: number; bonus?: number; streak?: number };
 
-export default function StudentSessionPage({ params }: { params: { code: string } }) {
-  const { code } = params;
+export default function StudentSessionPage({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = use(params);
   const [state, setState] = useState<SessionState | null>(null);
   const [connected, setConnected] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const [timeUp, setTimeUp] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const startedAtRef = useRef<number>(0);
   const answeredRef = useRef(false);
@@ -65,11 +66,12 @@ export default function StudentSessionPage({ params }: { params: { code: string 
       answeredRef.current = false;
       setLastResult(null);
       setPickedId(null);
+      setTimeUp(false);
     }
   }, [state?.phase, state?.question?.id]);
 
   function pick(optionId: string) {
-    if (answeredRef.current) return;
+    if (answeredRef.current || timeUp) return;
     answeredRef.current = true;
     setPickedId(optionId);
     const timeMs = Date.now() - startedAtRef.current;
@@ -124,6 +126,8 @@ export default function StudentSessionPage({ params }: { params: { code: string 
               startedAt={state.phaseStartedAt}
               durationMs={state.question.timeLimitSec * 1000}
               size={64}
+              sound
+              onEnd={() => setTimeUp(true)}
             />
           </div>
           <h1 className="mt-6 text-2xl md:text-3xl font-bold leading-relaxed text-center text-balance">
@@ -134,7 +138,7 @@ export default function StudentSessionPage({ params }: { params: { code: string 
               <button
                 key={o.id}
                 onClick={() => pick(o.id)}
-                disabled={answeredRef.current}
+                disabled={answeredRef.current || timeUp}
                 className={`py-6 text-xl border-2 rounded-sm bg-[color:var(--background)] transition-transform active:scale-[0.98] disabled:opacity-40 ${
                   pickedId === o.id
                     ? "border-[color:var(--gold)] bg-[color:var(--wash)]"
@@ -145,11 +149,15 @@ export default function StudentSessionPage({ params }: { params: { code: string 
               </button>
             ))}
           </div>
-          {pickedId && (
+          {pickedId ? (
             <p className="mt-8 text-center text-[color:var(--muted-ink)] result-in">
               تم إرسال إجابتك — انتظر كشف النتيجة
             </p>
-          )}
+          ) : timeUp ? (
+            <p className="mt-8 text-center text-[color:var(--muted-ink)] result-in">
+              انتهى الوقت — انتظر كشف النتيجة
+            </p>
+          ) : null}
         </section>
       )}
 
@@ -159,7 +167,6 @@ export default function StudentSessionPage({ params }: { params: { code: string 
             <span className="text-[color:var(--muted-ink)]">
               سؤال {state.questionIndex + 1} من {state.questionCount}
             </span>
-            <CountdownRing startedAt={state.phaseStartedAt} durationMs={phaseMs(REVIEW_MS)} size={64} tone="gold" />
           </div>
           <h1 className="mt-6 text-2xl md:text-3xl font-bold leading-relaxed text-center text-balance">
             {state.question.text}
@@ -168,7 +175,7 @@ export default function StudentSessionPage({ params }: { params: { code: string 
             {state.question.options.map((o) => (
               <div
                 key={o.id}
-                className={`py-6 text-xl text-center rounded-sm border-2 ${
+                className={`py-5 px-4 text-xl text-center rounded-sm border-2 ${
                   o.isCorrect
                     ? "border-[color:var(--gold)] bg-[color:var(--wash)] font-bold"
                     : pickedId === o.id
@@ -177,6 +184,11 @@ export default function StudentSessionPage({ params }: { params: { code: string 
                 }`}
               >
                 {o.text}
+                <VoteBar
+                  count={state.answers?.counts?.[o.id] ?? 0}
+                  total={state.answers?.total ?? 0}
+                  correct={o.isCorrect}
+                />
               </div>
             ))}
           </div>
@@ -214,11 +226,7 @@ export default function StudentSessionPage({ params }: { params: { code: string 
 
       {state.phase === "LEADERBOARD" && !isLast && (
         <section className="mt-10">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold">لوحة النتائج</h1>
-            <CountdownRing startedAt={state.phaseStartedAt} durationMs={phaseMs(SCOREBOARD_MS)} size={64} tone="gold" />
-          </div>
-          <p className="mt-2 text-sm text-[color:var(--muted-ink)]">السؤال التالي يبدأ بعد لحظات</p>
+          <h1 className="text-xl font-bold">لوحة النتائج</h1>
         </section>
       )}
 

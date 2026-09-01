@@ -29,7 +29,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen px-5 md:px-14 py-10 md:py-14 max-w-5xl w-full mx-auto">
+    <main className="min-h-screen w-full max-w-5xl mx-auto px-5 py-10 text-start md:px-14 md:py-14">
       {me === null ? null : me.role === "guest" ? (
         <GuestHero />
       ) : (
@@ -54,7 +54,7 @@ export default function Home() {
 function TeacherDashboard({ stats }: { stats: TeacherStats }) {
   const items: StatItem[] = [
     { label: "مجموعات الأسئلة", value: stats.quizzes },
-    { label: "جلسات المنافسة", value: stats.competitions },
+    { label: "جلسات المسابقات", value: stats.competitions },
     { label: "الطلاب المشاركون", value: stats.studentsReached },
     { label: "متوسط النتائج", value: stats.avgScore, tone: "gold" },
   ];
@@ -68,13 +68,13 @@ function TeacherDashboard({ stats }: { stats: TeacherStats }) {
       <section className="mt-10 flex flex-col sm:flex-row gap-4">
         <Link
           href="/quizzes"
-          className="text-center bg-[color:var(--foreground)] text-[color:var(--background)] px-8 py-3.5 text-lg font-semibold rounded-sm hover:bg-[#1f150a]"
+          className="text-center bg-[color:var(--foreground)] text-[color:var(--background)] px-8 py-3.5 text-lg font-semibold rounded-xl hover:bg-[#1f150a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--gold)]"
         >
-          ابدأ منافسة
+          ابدأ مسابقة
         </Link>
         <Link
           href="/results"
-          className="text-center border border-[color:var(--lapis)] px-8 py-3.5 text-lg font-semibold rounded-sm hover:bg-[color:var(--wash)]"
+          className="text-center border border-[color:var(--lapis)] px-8 py-3.5 text-lg font-semibold rounded-xl hover:bg-[color:var(--wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--gold)]"
         >
           عرض النتائج
         </Link>
@@ -119,7 +119,7 @@ function StudentDashboard({ stats }: { stats: StudentStats }) {
     { label: "أفضل مركز", value: stats.bestRank, kind: "rank", tone: "gold" },
     { label: "مجموع نقاطي", value: stats.totalPoints },
     {
-      label: "نسبة الصواب في الممارسة",
+      label: "نسبة الصواب في الاختبار",
       value: stats.practiceCorrectRate,
       kind: "percent",
     },
@@ -134,68 +134,135 @@ function StudentDashboard({ stats }: { stats: StudentStats }) {
       <section className="mt-10 flex flex-col sm:flex-row gap-4">
         <Link
           href="/join"
-          className="text-center bg-[color:var(--foreground)] text-[color:var(--background)] px-8 py-3.5 text-lg font-semibold rounded-sm hover:bg-[#1f150a]"
+          className="text-center bg-[color:var(--foreground)] text-[color:var(--background)] px-8 py-3.5 text-lg font-semibold rounded-xl hover:bg-[#1f150a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--gold)]"
         >
           دخول جلسة
         </Link>
         <Link
           href="/quizzes"
-          className="text-center border border-[color:var(--lapis)] px-8 py-3.5 text-lg font-semibold rounded-sm hover:bg-[color:var(--wash)]"
+          className="text-center border border-[color:var(--lapis)] px-8 py-3.5 text-lg font-semibold rounded-xl hover:bg-[color:var(--wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--gold)]"
         >
-          ممارسة ذاتية
+          اختبار ذاتي
         </Link>
       </section>
     </>
   );
 }
 
+const joinSteps = [
+  {
+    number: "١",
+    title: "اختيار الاختبار",
+    description: "يختار المعلّم الاختبار من المكتبة ويطلق المسابقة للصف.",
+  },
+  {
+    number: "٢",
+    title: "دخول الجلسة",
+    description: "يستخدم الطالب رمز الجلسة أو QR، ثم يكتب اسمًا مستعارًا بلا حساب.",
+  },
+  {
+    number: "٣",
+    title: "عرض النتائج",
+    description: "يجيب الطلاب عن الأسئلة، وتظهر لوحة الصدارة بعد كل سؤال.",
+  },
+];
+
 function GuestHero() {
   return (
-    <div className="grid md:grid-cols-[1fr_auto] gap-10 items-start">
-      <div>
-        <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--gold-deep)]" dir="ltr">
-          DAR MAKKAH
-        </p>
-        <h1 className="mt-5 text-4xl md:text-5xl font-bold leading-snug text-[color:var(--foreground)]">
-          أسئلة القرآن
-          <br />
-          لمنافسة صفّية مباشرة
-        </h1>
-        <p className="mt-5 text-lg leading-8 text-[color:var(--body-ink)]">
-          أنشئ المعلّم الاختبار، ويدخل الطالب برقم الجلسة واسم مستعار — بلا حساب.
-        </p>
-        <div className="mt-10 flex flex-col sm:flex-row gap-4">
-          <Link
-            href="/join"
-            className="text-center bg-[color:var(--foreground)] text-[color:var(--background)] px-9 py-4 text-lg font-semibold rounded-sm hover:bg-[#1f150a]"
-          >
-            ابدأ جلسة
-          </Link>
-          <Link
-            href="/quizzes"
-            className="text-center border border-[color:var(--lapis)] text-[color:var(--foreground)] px-9 py-4 text-lg font-semibold rounded-sm hover:bg-[color:var(--wash)]"
-          >
-            مكتبة الأسئلة
-          </Link>
+    <>
+      <div className="grid md:grid-cols-[1fr_18rem] gap-12 items-start">
+        <div>
+          <div className="flex items-start gap-4">
+            <h1 className="text-balance text-5xl md:text-6xl font-bold leading-[1.2] text-[color:var(--foreground)]">
+              اختبارات قرآنية
+              <br />
+              للصف
+            </h1>
+            <span className="medallion mt-3 shrink-0" aria-hidden="true" />
+          </div>
+          <p className="font-body-serif mt-7 max-w-[34rem] text-lg md:text-xl leading-9 text-[color:var(--body-ink)]">
+            أنشئ اختبارًا من مكتبة الأسئلة، أو انضم إلى مسابقة مباشرة باستخدام رمز الجلسة.
+          </p>
         </div>
-        <p className="mt-12 text-sm leading-7 text-[color:var(--muted-ink)]">
-          للممارسة الذاتية: حساب للطالب يحفظ تقدّمه، وتصحيح يدوي لأسئلة الإجابة الحرة.
-        </p>
+
+        <section
+          className="border-s border-[color:var(--rule)] ps-6 md:ps-8"
+          aria-label="ابدأ من هنا"
+        >
+          <h2 className="text-xl font-semibold">ابدأ من هنا</h2>
+          <div className="mt-5">
+            <div className="border-t border-[color:var(--rule)] py-5">
+              <div className="flex items-baseline justify-between gap-4">
+                <h3 className="text-lg font-semibold">دخول جلسة</h3>
+                <span className="text-sm text-[color:var(--muted-ink)]">للطالب</span>
+              </div>
+              <p className="mt-2 text-sm leading-7 text-[color:var(--body-ink)]">
+                أدخل رمز الجلسة الذي عرضه المعلّم وانضم باسم مستعار.
+              </p>
+              <Link
+                href="/join"
+                className="mt-4 inline-flex rounded-xl bg-[color:var(--foreground)] px-5 py-3 font-semibold text-[color:var(--background)] hover:bg-[#1f150a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--gold)]"
+              >
+                دخول الجلسة
+              </Link>
+            </div>
+            <div className="border-t border-[color:var(--rule)] py-5">
+              <div className="flex items-baseline justify-between gap-4">
+                <h3 className="text-lg font-semibold">إنشاء اختبار</h3>
+                <span className="text-sm text-[color:var(--muted-ink)]">للمعلّم</span>
+              </div>
+              <p className="mt-2 text-sm leading-7 text-[color:var(--body-ink)]">
+                أنشئ الأسئلة ثم أطلق مسابقة أو اختبارًا ذاتيًا.
+              </p>
+              <Link
+                href="/quizzes"
+                className="mt-4 inline-flex rounded-xl border border-[color:var(--lapis)] px-5 py-3 font-semibold text-[color:var(--foreground)] hover:bg-[color:var(--wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--gold)]"
+              >
+                فتح المكتبة
+              </Link>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <div className="octa p-8 w-full max-w-xs">
-        <p className="text-xs tracking-[0.25em] uppercase text-[color:var(--red)]" dir="ltr">
-          JOIN CODE
-        </p>
-        <p className="mt-2 text-5xl font-bold tracking-[0.1em] text-[color:var(--foreground)]" dir="ltr">
-          7<span className="text-[color:var(--gold)]">4</span>1
-          <span className="text-[color:var(--gold)]">9</span>2
-          <span className="text-[color:var(--gold)]">8</span>
-        </p>
-        <p className="mt-2 text-sm text-[color:var(--muted-ink)]">
-          ادخل الرقم ثم اختر اسمك المستعار
-        </p>
-      </div>
-    </div>
+      <section
+        className="mt-16 border-t border-[color:var(--rule)] pt-10"
+        aria-label="المسابقة والاختبار"
+      >
+        <h2 className="text-2xl font-semibold">المسابقة والاختبار</h2>
+        <div className="mt-8 md:grid md:grid-cols-2">
+          <article className="md:pe-12">
+            <h3 className="text-xl font-semibold">مسابقة مباشرة</h3>
+            <p className="mt-3 leading-8 text-[color:var(--body-ink)]">
+              للحصة الدراسية. ينضم الطلاب برمز الجلسة أو QR، ويجيبون خلال الوقت المحدد. تُحسب
+              النقاط حسب صحة الإجابة وسرعة الرد.
+            </p>
+          </article>
+          <article className="mt-10 border-t border-[color:var(--rule)] pt-10 md:mt-0 md:border-t-0 md:border-s md:ps-12">
+            <h3 className="text-xl font-semibold">اختبار ذاتي</h3>
+            <p className="mt-3 leading-8 text-[color:var(--body-ink)]">
+              للطالب الذي يريد الإجابة في وقته. تُحفظ الإجابات، ويصحّح المعلّم إجابات الأسئلة الحرة
+              يدويًا.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section
+        className="mt-16 border-t border-[color:var(--rule)] pt-10"
+        aria-label="كيف تعمل المسابقة"
+      >
+        <h2 className="text-2xl font-semibold">كيف تعمل المسابقة؟</h2>
+        <ol className="mt-8 grid gap-6 md:grid-cols-3">
+          {joinSteps.map((step) => (
+            <li key={step.number} className="border-s border-[color:var(--rule)] ps-5">
+              <span className="text-lg font-bold text-[color:var(--gold-deep)]">{step.number}</span>
+              <h3 className="mt-2 text-lg font-semibold">{step.title}</h3>
+              <p className="mt-2 text-sm leading-7 text-[color:var(--body-ink)]">{step.description}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </>
   );
 }
