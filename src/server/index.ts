@@ -1,6 +1,7 @@
 // Custom server entry — hosts Next.js and Socket.IO on one Node process
 // Use for `npm run dev` / `npm run start` instead of `next dev`.
 
+import "./env";
 import { createServer } from "http";
 import next from "next";
 import { Server as SocketIOServer } from "socket.io";
