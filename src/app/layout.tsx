@@ -50,6 +50,10 @@ export const metadata: Metadata = {
   description: "منصة اختبارات ومسابقات قرآنية",
 };
 
+// clerkEnabled() reads runtime env (present only on the VPS, never in CI) —
+// prerendering would bake clerkOn=false into static HTML. Render per-request.
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
