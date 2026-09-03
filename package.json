@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "cross-env NODE_ENV=production tsx src/server/index.ts",
     "lint": "eslint .",
+    "test": "tsx --test",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -15,13 +16,15 @@
     "@prisma/client": "^6.4.1",
     "@types/qrcode": "^1.5.6",
     "framer-motion": "^13.1.1",
+    "mammoth": "^1.12.2",
     "next": "^16.3.4",
     "prisma": "^6.4.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",

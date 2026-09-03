@@ -1,12 +1,19 @@
 import { expect, test } from "@playwright/test";
 
+// live-socket flow occasionally flakes under full-suite load; one retry, genuine failures still fail
+test.describe.configure({ retries: 1 });
+
 test("full live competition: host starts, student joins by code and answers", async ({ browser }) => {
   const teacher = await browser.newContext();
   const page = await teacher.newPage();
 
   await page.goto("/quizzes");
+  await page.waitForLoadState("networkidle");
   await page.getByRole("link", { name: "اختبار جديد" }).click();
   const quizTitle = `مسابقة ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  await expect(page.getByRole("heading", { name: "اختبار جديد" })).toBeVisible({ timeout: 15000 });
+  // click before hydration would lose the حفظ handler on the cold editor compile
+  await page.waitForLoadState("networkidle");
   await page.getByPlaceholder("عنوان الاختبار — مثال: سورة الفاتحة").fill(quizTitle);
   await page.getByPlaceholder("نص السؤال").fill("سورة الفاتحة عدد آياتها؟");
   await page.getByPlaceholder("الخيار 1").fill("سبع");

@@ -24,6 +24,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           text: q.text,
           timeLimitSec: q.timeLimitSec,
           order: q.order,
+          sourceEvidence: q.sourceEvidence ?? undefined,
           options:
             q.kind === "INPUT"
               ? undefined

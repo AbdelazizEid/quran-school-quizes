@@ -10,11 +10,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const quiz = await prisma.quiz.findFirst({
     where: { id, authorId: teacher.id },
-    include: { _count: { select: { questions: true } } },
+    include: { questions: { select: { kind: true } } },
   });
   if (!quiz) return NextResponse.json({ error: "not-found" }, { status: 404 });
-  if (quiz._count.questions === 0) {
+  if (quiz.questions.length === 0) {
     return NextResponse.json({ error: "quiz-has-no-questions" }, { status: 400 });
+  }
+  // INPUT Questions are Practice-only: free-text answers cannot be scored in
+  // a live Competition, so launching one must fail loudly, not silently skip.
+  if (quiz.questions.some((question) => question.kind === "INPUT")) {
+    return NextResponse.json({ error: "input-questions-not-allowed-in-competition" }, { status: 400 });
   }
 
   const session = await createCompetitionSession(quiz.id, teacher.id);

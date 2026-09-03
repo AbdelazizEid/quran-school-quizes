@@ -9,10 +9,13 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
 
 test("quiz CRUD: create quiz with questions via dashboard", async ({ page }) => {
   await page.goto("/quizzes");
+  await page.waitForLoadState("networkidle");
   await expect(page.getByRole("heading", { name: "مكتبة الأسئلة" })).toBeVisible();
 
   await page.getByRole("link", { name: "اختبار جديد" }).click();
-  await expect(page.getByRole("heading", { name: "اختبار جديد" })).toBeVisible();
+  // dev cold-compile of the editor route can exceed the 5s default
+  await expect(page.getByRole("heading", { name: "اختبار جديد" })).toBeVisible({ timeout: 15000 });
+  await page.waitForLoadState("networkidle");
 
   const title = `اختبار ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   await page.getByPlaceholder("عنوان الاختبار — مثال: سورة الفاتحة").fill(title);
@@ -57,7 +60,16 @@ test("header shows on library pages and hides on live game screens", async ({ pa
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: `header-${Date.now()}`,
-        questions: [{ kind: "MCQ", text: "كم عدد سور القرآن؟", options: [{ text: "114", isCorrect: true }] }],
+        questions: [
+          {
+            kind: "MCQ",
+            text: "كم عدد سور القرآن؟",
+            options: [
+              { text: "114", isCorrect: true },
+              { text: "113", isCorrect: false },
+            ],
+          },
+        ],
       }),
     }).then((r) => r.json());
     return fetch(`/api/quizzes/${q.quiz.id}/session`, { method: "POST" }).then((r) => r.json());
@@ -68,6 +80,8 @@ test("header shows on library pages and hides on live game screens", async ({ pa
 
 test("join page validates code and nickname", async ({ page }) => {
   await page.goto("/join");
+  // click before hydration submits the form natively and loses the validation
+  await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "ادخل" }).click();
   await expect(page.getByText("رقم الجلسة من 6 إلى 7 أرقام")).toBeVisible();
 

@@ -16,6 +16,7 @@ export default function QuizzesPage() {
   const [quizzes, setQuizzes] = useState<QuizRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch("/api/quizzes");
@@ -41,10 +42,19 @@ export default function QuizzesPage() {
 
   async function startSession(id: string) {
     setStarting(id);
+    setError(null);
     const res = await fetch(`/api/quizzes/${id}/session`, { method: "POST" });
     const data = await res.json();
     setStarting(null);
-    if (res.ok) router.push(`/host/${data.session.id}`);
+    if (res.ok) {
+      router.push(`/host/${data.session.id}`);
+      return;
+    }
+    if (data.error === "input-questions-not-allowed-in-competition") {
+      setError("هذا الاختبار يحتوي أسئلة إجابة حرة وهي للاختبار الذاتي فقط. احذفها أو عدّل نوعها قبل بدء المسابقة.");
+    } else {
+      setError("تعذّر بدء المسابقة. حاول مرة أخرى.");
+    }
   }
 
   return (
@@ -56,7 +66,7 @@ export default function QuizzesPage() {
           </p>
           <h1 className="mt-2 text-3xl font-bold">مكتبة الأسئلة</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             href="/results"
             className="border border-[color:var(--rule)] px-5 py-3 rounded-sm font-semibold"
@@ -69,10 +79,18 @@ export default function QuizzesPage() {
           >
             اختبار جديد
           </Link>
+          <Link
+            href="/ai-quiz-drafts"
+            className="border border-[color:var(--lapis)] text-[color:var(--lapis)] px-6 py-3 font-semibold rounded-sm"
+          >
+            مسودة بالذكاء الاصطناعي
+          </Link>
         </div>
       </header>
 
       {loading && <p className="mt-10 text-[color:var(--muted-ink)]">جارٍ التحميل…</p>}
+
+      {error && <p className="mt-6 text-[color:var(--red)]" role="alert">{error}</p>}
 
       {!loading && quizzes.length === 0 && (
         <p className="mt-10 text-[color:var(--muted-ink)]">لا توجد اختبارات بعد — أنشئ أول اختبار.</p>
@@ -81,8 +99,8 @@ export default function QuizzesPage() {
       <ul className="mt-10 flex flex-col gap-4">
         {quizzes.map((q) => (
           <li key={q.id} className="border border-[color:var(--rule)] rounded-sm p-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <Link href={`/quizzes/${q.id}`} className="text-xl font-bold hover:underline">
+            <div className="min-w-0">
+              <Link href={`/quizzes/${q.id}`} className="text-xl font-bold hover:underline break-words">
                 {q.title}
               </Link>
               <p className="text-sm text-[color:var(--muted-ink)]">

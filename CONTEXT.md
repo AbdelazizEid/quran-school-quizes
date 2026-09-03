@@ -18,6 +18,22 @@ _Avoid_: review, submission
 A reusable set of questions on Quranic material (surahs, ayahs, tajwid, meaning). A Quiz is not tied to how it is played; it can be launched in either mode.
 _Avoid_: test, exam, question bank
 
+**AI Quiz Draft Conversation**:
+A private, resumable workspace where a Teacher provides instructions or source material and collaborates with AI to create and revise Questions before explicitly saving them as a Quiz. It is not itself a Quiz.
+_Avoid_: AI chat, automatic Quiz, generator
+
+**Source Policy**:
+The per-conversation choice of General knowledge only, Uploaded sources only, or Uploaded sources plus general knowledge. General knowledge only is the default.
+_Avoid_: AI mode, context mode
+
+**Source Evidence**:
+The supporting excerpt and document reference attached to a Question when available, or a clear indication that the Question came from general knowledge. It is visible to Teachers and hidden from Students.
+_Avoid_: citation shown to Students, proof
+
+**AI Revision**:
+A targeted, previewable change proposed by AI for an AI Quiz Draft Conversation. It is not applied until the Teacher chooses to apply it.
+_Avoid_: automatic rewrite, regeneration
+
 **Quiz Copy**:
 A Teacher can share a Quiz so that another Teacher can copy it into their own library. A copy is detached from the original — edits no longer propagate.
 _Avoid_: share, clone, template

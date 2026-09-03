@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { compactSourceEvidence, normalizeManualQuestions, validateQuizDraft } from "@/lib/ai-quiz-draft";
 import { prisma } from "@/lib/prisma";
 import { getTeacher } from "@/lib/teacher";
 
@@ -36,8 +37,23 @@ export async function PUT(req: NextRequest, { params }: Params) {
       text: string;
       timeLimitSec?: number;
       options?: { text: string; isCorrect: boolean }[];
+      sourceEvidence?: unknown;
     }[];
   };
+
+  // Manual edits pass the same semantic validator as the AI save boundary
+  // whenever Question data is being replaced.
+  let normalizedQuestions: ReturnType<typeof normalizeManualQuestions> | null = null;
+  if (body.questions !== undefined) {
+    normalizedQuestions = normalizeManualQuestions(body.questions);
+    const effectiveTitle = body.title !== undefined ? body.title.trim() : owned.quiz.title;
+    const validation = validateQuizDraft({
+      title: effectiveTitle,
+      description: body.description ?? owned.quiz.description ?? "",
+      questions: normalizedQuestions,
+    });
+    if (!validation.valid) return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
 
   const quiz = await prisma.$transaction(async (tx) => {
     await tx.quiz.update({
@@ -47,29 +63,23 @@ export async function PUT(req: NextRequest, { params }: Params) {
         description: body.description?.trim() ?? undefined,
       },
     });
-    if (body.questions) {
+    if (normalizedQuestions) {
       await tx.question.deleteMany({ where: { quizId: id } });
-      for (let i = 0; i < body.questions.length; i++) {
-        const q = body.questions[i];
+      for (let i = 0; i < normalizedQuestions.length; i++) {
+        const q = normalizedQuestions[i];
         await tx.question.create({
           data: {
             quizId: id,
             kind: q.kind,
             text: q.text,
-            timeLimitSec: q.timeLimitSec ?? 20,
+            timeLimitSec: q.timeLimitSec,
             order: i,
+            sourceEvidence:
+              body.questions?.[i]?.sourceEvidence == null ? undefined : compactSourceEvidence(body.questions[i].sourceEvidence),
             options:
               q.kind === "INPUT"
                 ? undefined
-                : {
-                    create:
-                      q.kind === "TRUE_FALSE"
-                        ? [
-                            { text: "صح", isCorrect: q.options?.some((o) => o.isCorrect && o.text === "صح") ?? false, order: 0 },
-                            { text: "خطأ", isCorrect: q.options?.some((o) => o.isCorrect && o.text === "خطأ") ?? false, order: 1 },
-                          ]
-                        : (q.options ?? []).slice(0, 4).map((o, oi) => ({ text: o.text, isCorrect: o.isCorrect, order: oi })),
-                  },
+                : { create: q.options.map((o, oi) => ({ text: o.text, isCorrect: o.isCorrect, order: oi })) },
           },
         });
       }

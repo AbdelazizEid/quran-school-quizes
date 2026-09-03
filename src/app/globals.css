@@ -97,10 +97,43 @@ h3 {
   transform-origin: center;
 }
 
+/* Lobby: the medallion breathes while students gather. */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+.medallion-breathe {
+  animation: breathe 2.2s ease-in-out infinite;
+}
+
+/* Wrong pick: one small nudge, not an alarm. */
+@keyframes result-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.result-shake {
+  animation: result-shake 280ms ease-in-out 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sb-enter,
   .result-in,
-  .sb-spark {
+  .sb-spark,
+  .medallion-breathe,
+  .result-shake {
     animation: none !important;
   }
   .sb-row {

@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState, use } from "react";
 import { io, type Socket } from "socket.io-client";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { SessionState } from "@/lib/session-state";
 import CountdownRing from "@/components/CountdownRing";
 import Scoreboard from "@/components/Scoreboard";
 import Podium from "@/components/Podium";
 import VoteBar from "@/components/VoteBar";
+import Confetti from "@/components/Confetti";
+import { sfx } from "@/lib/sfx";
+import { CORRECT_CHEERS, WRONG_PATS, pickOne, streakCheer } from "@/lib/cheer";
 
 type JoinResult = { ok: boolean; participantId?: string; nickname?: string; error?: string };
 type AnswerResult = { ok: boolean; correct?: boolean; points?: number; bonus?: number; streak?: number };
@@ -24,6 +27,12 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
   const socketRef = useRef<Socket | null>(null);
   const startedAtRef = useRef<number>(0);
   const answeredRef = useRef(false);
+  const [burst, setBurst] = useState(0);
+  const [cheerLine, setCheerLine] = useState("");
+  const reduced = useReducedMotion();
+  const celebratedForRef = useRef<string | null>(null);
+  const joinCountRef = useRef(0);
+  const finaleRef = useRef(false);
 
   useEffect(() => {
     const socket = io("/session", {
@@ -60,6 +69,12 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
 
   const isLast = state ? state.questionIndex + 1 >= state.questionCount : false;
 
+  const shown: AnswerResult | null =
+    state?.phase === "ANSWER_REVIEW"
+      ? lastResult ??
+        (meId && state.results?.[meId] ? ({ ok: true, ...state.results[meId] } as AnswerResult) : null)
+      : null;
+
   useEffect(() => {
     if (state?.phase === "QUESTION" && state.question) {
       startedAtRef.current = Date.now();
@@ -69,6 +84,38 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
       setTimeUp(false);
     }
   }, [state?.phase, state?.question?.id]);
+
+  // one celebration per question reveal: cheer copy, chime, confetti
+  useEffect(() => {
+    if (state?.phase !== "ANSWER_REVIEW") return;
+    const key = state.question?.id;
+    if (!key || celebratedForRef.current === key) return;
+    celebratedForRef.current = key;
+    if (shown?.correct) {
+      setCheerLine(pickOne(CORRECT_CHEERS));
+      sfx.correct();
+      setBurst((b) => b + 1);
+    } else {
+      setCheerLine(pickOne(WRONG_PATS));
+      sfx.wrong();
+    }
+  }, [state?.phase, state?.question?.id, shown]);
+
+  // final podium: fanfare + one golden shower
+  useEffect(() => {
+    const finale = state?.phase === "CLOSED" || (state?.phase === "LEADERBOARD" && isLast);
+    if (!finale || finaleRef.current) return;
+    finaleRef.current = true;
+    sfx.fanfare();
+    setBurst((b) => b + 1);
+  }, [state?.phase, isLast]);
+
+  // lobby: a soft pop as each classmate lands
+  useEffect(() => {
+    const n = state?.roster?.length ?? 0;
+    if (n > joinCountRef.current) sfx.join();
+    joinCountRef.current = n;
+  }, [state?.roster?.length]);
 
   function pick(optionId: string) {
     if (answeredRef.current || timeUp) return;
@@ -92,6 +139,7 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
 
   return (
     <Shell>
+      <Confetti fire={burst} />
       <header className="flex items-baseline justify-between text-sm text-[color:var(--muted-ink)]">
         <span>{state.quizTitle}</span>
         {nickname && <span>أنت: {nickname}</span>}
@@ -99,10 +147,16 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
 
       {state.phase === "LOBBY" && (
         <section className="mt-16 text-center">
-          <div className="medallion" />
+          <div className="medallion medallion-breathe" />
           <h1 className="mt-6 text-2xl font-bold">في انتظار بدء الجلسة</h1>
           <p className="mt-3 text-[color:var(--muted-ink)]">
-            {state.roster?.length ?? 0} طالبًا في الردهة
+            <span
+              key={state.roster?.length ?? 0}
+              className="sb-enter inline-block tabular-nums font-bold text-xl text-[color:var(--foreground)]"
+            >
+              {state.roster?.length ?? 0}
+            </span>{" "}
+            طالبًا في الردهة
           </p>
           {state.roster && state.roster.length > 0 && (
             <ul className="mt-8 flex flex-wrap justify-center gap-2">
@@ -130,25 +184,38 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
               onEnd={() => setTimeUp(true)}
             />
           </div>
-          <h1 className="mt-6 text-2xl md:text-3xl font-bold leading-relaxed text-center text-balance">
-            {state.question.text}
-          </h1>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2">
-            {state.question.options.map((o) => (
-              <button
-                key={o.id}
-                onClick={() => pick(o.id)}
-                disabled={answeredRef.current || timeUp}
-                className={`py-6 text-xl border-2 rounded-sm bg-[color:var(--background)] transition-transform active:scale-[0.98] disabled:opacity-40 ${
-                  pickedId === o.id
-                    ? "border-[color:var(--gold)] bg-[color:var(--wash)]"
-                    : "border-[color:var(--lapis)] hover:bg-[color:var(--wash)]"
-                }`}
-              >
-                {o.text}
-              </button>
-            ))}
+          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-[color:var(--rule)]">
+            <div
+              className="h-full bg-[color:var(--gold)] transition-all duration-500"
+              style={{ width: `${(state.questionIndex / state.questionCount) * 100}%` }}
+            />
           </div>
+          <motion.div
+            key={state.question.id}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <h1 className="mt-6 text-2xl md:text-3xl font-bold leading-relaxed text-center text-balance">
+              {state.question.text}
+            </h1>
+            <div className="mt-10 grid gap-4 sm:grid-cols-2">
+              {state.question.options.map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => pick(o.id)}
+                  disabled={answeredRef.current || timeUp}
+                  className={`py-6 text-xl border-2 rounded-sm bg-[color:var(--background)] transition-transform active:scale-[0.98] disabled:opacity-40 ${
+                    pickedId === o.id
+                      ? "border-[color:var(--gold)] bg-[color:var(--wash)]"
+                      : "border-[color:var(--lapis)] hover:bg-[color:var(--wash)]"
+                  }`}
+                >
+                  {o.text}
+                </button>
+              ))}
+            </div>
+          </motion.div>
           {pickedId ? (
             <p className="mt-8 text-center text-[color:var(--muted-ink)] result-in">
               تم إرسال إجابتك — انتظر كشف النتيجة
@@ -162,29 +229,70 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
       )}
 
       {state.phase === "ANSWER_REVIEW" && state.question && (
-        <section className="mt-8">
+        <section className="mt-6">
           <div className="flex items-center justify-between text-sm">
             <span className="text-[color:var(--muted-ink)]">
               سؤال {state.questionIndex + 1} من {state.questionCount}
             </span>
           </div>
-          <h1 className="mt-6 text-2xl md:text-3xl font-bold leading-relaxed text-center text-balance">
+          {shown && (
+            <motion.div
+              className="mt-3 text-center"
+              initial={{ opacity: 0, y: 14, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 320, damping: 24 }}
+            >
+              <p className="flex items-baseline justify-center gap-3">
+                <span
+                  className="text-2xl font-bold"
+                  style={{ color: shown.correct ? "var(--gold-deep)" : "var(--red)" }}
+                >
+                  {shown.correct ? "إجابة صحيحة!" : "إجابة غير صحيحة"}
+                </span>
+                {shown.correct && (
+                  <span className="text-xl font-semibold text-[color:var(--lapis)] tabular-nums" dir="ltr">
+                    +{shown.points}
+                  </span>
+                )}
+              </p>
+              <p
+                className={`mt-0.5 flex flex-wrap items-center justify-center gap-x-3 text-sm font-semibold ${
+                  shown.correct ? "text-[color:var(--lapis)]" : "text-[color:var(--muted-ink)]"
+                }`}
+              >
+                <span>{cheerLine}</span>
+                {shown.correct && (shown.streak ?? 0) >= 2 && (
+                  <span className="inline-flex items-center gap-1.5 text-[color:var(--gold-deep)]">
+                    <Spark />
+                    {streakCheer(shown.streak ?? 0)} ×{shown.streak} — مكافأة +{shown.bonus}
+                  </span>
+                )}
+              </p>
+            </motion.div>
+          )}
+          <h1 className="mt-5 text-lg md:text-xl font-bold leading-relaxed text-center text-balance">
             {state.question.text}
           </h1>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {state.question.options.map((o) => (
               <div
                 key={o.id}
-                className={`py-5 px-4 text-xl text-center rounded-sm border-2 ${
+                className={`px-4 py-2.5 rounded-sm border-2 ${
                   o.isCorrect
-                    ? "border-[color:var(--gold)] bg-[color:var(--wash)] font-bold"
+                    ? "border-[color:var(--gold)] bg-[color:var(--wash)]"
                     : pickedId === o.id
-                      ? "border-[color:var(--red)] opacity-80"
+                      ? "border-[color:var(--red)] opacity-80 result-shake"
                       : "border-[color:var(--rule)] opacity-60"
                 }`}
               >
-                {o.text}
+                {o.isCorrect && (
+                  <div className="text-xs font-bold tracking-wide text-[color:var(--gold-deep)] text-center">
+                    الإجابة الصحيحة
+                  </div>
+                )}
+                <div className={`text-center text-base md:text-lg ${o.isCorrect ? "font-bold" : ""}`}>{o.text}</div>
                 <VoteBar
+                  compact
                   count={state.answers?.counts?.[o.id] ?? 0}
                   total={state.answers?.total ?? 0}
                   correct={o.isCorrect}
@@ -192,35 +300,6 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
               </div>
             ))}
           </div>
-          {(() => {
-            const shown = lastResult ?? (meId && state.results?.[meId] ? { ok: true as const, ...state.results[meId] } : null);
-            return shown ? (
-            <motion.div
-              className="mt-8 text-center"
-              initial={{ opacity: 0, y: 14, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 320, damping: 24 }}
-            >
-                <p
-                className="text-2xl font-bold"
-                style={{ color: shown.correct ? "var(--gold-deep)" : "var(--red)" }}
-              >
-                {shown.correct ? "إجابة صحيحة!" : "إجابة غير صحيحة"}
-              </p>
-              {shown.correct && (
-                <p className="mt-2 text-xl font-semibold text-[color:var(--lapis)] tabular-nums" dir="ltr">
-                  +{shown.points}
-                </p>
-              )}
-              {shown.correct && (shown.streak ?? 0) >= 2 && (
-                <p className="mt-3 inline-flex items-center gap-2 text-[color:var(--gold-deep)] font-semibold">
-                  <Spark />
-                  سلسلة ×{shown.streak} — مكافأة +{shown.bonus}
-                </p>
-              )}
-            </motion.div>
-            ) : null;
-          })()}
         </section>
       )}
 
@@ -249,6 +328,7 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
           <div className="mt-8">
             <Podium rows={state.leaderboard ?? []} />
           </div>
+          <p className="mt-6 text-xl font-bold text-[color:var(--gold-deep)]">أحسنتم جميعًا!</p>
           <p className="mt-10 text-[color:var(--muted-ink)]">انتهت الجلسة، شكرًا لمشاركتك.</p>
         </section>
       )}

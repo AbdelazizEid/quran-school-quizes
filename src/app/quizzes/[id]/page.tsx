@@ -2,13 +2,18 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { validationErrorMessage } from "@/lib/ai-quiz-draft";
 
 type OptionInput = { text: string; isCorrect: boolean };
+type SourceEvidence =
+  | { type: "general_knowledge"; label: string }
+  | { type: "source"; label: string; documentName: string; excerpt: string; pageSection?: string };
 type QuestionInput = {
   kind: "MCQ" | "TRUE_FALSE" | "INPUT";
   text: string;
   timeLimitSec: number;
   options: OptionInput[];
+  sourceEvidence?: SourceEvidence | null;
 };
 type QuizForm = { title: string; description: string; questions: QuestionInput[] };
 
@@ -44,6 +49,7 @@ export default function QuizEditorPage() {
             text: q.text as string,
             timeLimitSec: (q.timeLimitSec as number) ?? 20,
             options: (q.options ?? []).map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
+            sourceEvidence: (q.sourceEvidence as SourceEvidence | null) ?? null,
           })),
         });
       });
@@ -108,7 +114,8 @@ export default function QuizEditorPage() {
     });
     setSaving(false);
     if (!res.ok) {
-      setError("تعذّر الحفظ");
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      setError(data.error ? validationErrorMessage(data.error) : "تعذّر الحفظ");
       return;
     }
     router.push("/quizzes");
@@ -216,6 +223,13 @@ export default function QuizEditorPage() {
           {q.kind === "INPUT" && (
             <p className="mt-4 text-sm text-[color:var(--muted-ink)]">
               تُصحَّح الإجابات الحرة يدويًا من المعلّم بعد الاختبار.
+            </p>
+          )}
+          {q.sourceEvidence && (
+            <p className="mt-4 border-s border-[color:var(--gold)] ps-3 text-sm text-[color:var(--muted-ink)]">
+              {q.sourceEvidence.type === "source"
+                ? `${q.sourceEvidence.label} — ${q.sourceEvidence.documentName}${q.sourceEvidence.pageSection ? ` (${q.sourceEvidence.pageSection})` : ""}: «${q.sourceEvidence.excerpt}»`
+                : q.sourceEvidence.label}
             </p>
           )}
         </section>

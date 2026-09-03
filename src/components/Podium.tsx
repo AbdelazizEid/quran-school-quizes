@@ -10,7 +10,7 @@ export default function Podium({ rows }: { rows: Row[] }) {
   if (top.length === 0) return null;
 
   const order = top.length === 3 ? [1, 0, 2] : top.length === 2 ? [1, 0] : [0];
-  const heights = ["h-16", "h-24", "h-12"];
+  const heights = ["h-24", "h-16", "h-12"];
   const inks = ["text-[color:var(--gold-deep)]", "text-[color:var(--foreground)]", "text-[color:var(--muted-ink)]"];
   const borders = ["border-[color:var(--gold)]", "border-[color:var(--lapis)]", "border-[color:var(--rule)]"];
   // reveal 3rd → 2nd → 1st, Kahoot-style

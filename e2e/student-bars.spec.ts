@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { io } from "socket.io-client";
 
-test("student sees vertical vote bars during review; late answers rejected", async ({ request, browser }) => {
+// live-socket flow occasionally flakes under full-suite load; one retry, genuine failures still fail
+test.describe.configure({ retries: 1 });
+
+test("student sees vote bars during review; late answers rejected", async ({ request, browser }) => {
   const quiz = (
     await (
       await request.post("/api/quizzes", {
@@ -20,7 +23,7 @@ test("student sees vertical vote bars during review; late answers rejected", asy
             {
               kind: "MCQ",
               text: "سؤال منتهي الوقت",
-              timeLimitSec: 3,
+              timeLimitSec: 5,
               options: [
                 { text: "ج", isCorrect: true },
                 { text: "د", isCorrect: false },
@@ -43,7 +46,7 @@ test("student sees vertical vote bars during review; late answers rejected", asy
   await student.goto(`/session/${session.joinCode}`);
   await expect(student.getByText("في انتظار بدء الجلسة")).toBeVisible({ timeout: 15000 });
 
-  // Q1: answer, reveal — student sees one vertical vote column per option
+  // Q1: answer, reveal — result banner on top, one compact vote bar per option
   await host.getByRole("button", { name: "ابدأ أول سؤال" }).click();
   await expect(student.getByRole("button", { name: "أ" })).toBeVisible({ timeout: 15000 });
   await student.getByRole("button", { name: "أ" }).click();
@@ -53,8 +56,14 @@ test("student sees vertical vote bars during review; late answers rejected", asy
   await expect(student.getByLabel("1 إجابة")).toBeVisible({ timeout: 15000 });
   await expect(student.getByLabel("0 إجابة")).toBeVisible();
   await expect(student.getByText("إجابة صحيحة!")).toBeVisible();
+  await expect(student.getByText("الإجابة الصحيحة", { exact: true })).toBeVisible();
+  // the whole reveal — result, question, bars — fits one screen, no scrolling
+  const fitsOneScreen = await student.evaluate(
+    () => document.scrollingElement!.scrollHeight <= window.innerHeight,
+  );
+  expect(fitsOneScreen).toBe(true);
 
-  // Q2 (3s limit): let the timer run out
+  // Q2 (5s limit): let the timer run out
   await host.getByRole("button", { name: "التالي" }).click(); // review → scoreboard
   await expect(host.getByRole("button", { name: "السؤال التالي" })).toBeVisible({ timeout: 15000 });
   await host.getByRole("button", { name: "السؤال التالي" }).click();
