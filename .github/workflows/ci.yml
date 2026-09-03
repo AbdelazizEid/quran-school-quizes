@@ -23,14 +23,21 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     steps:
-      - uses: appleboy/ssh-action@v1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd /root/quran-school-quizes
-            git pull --ff-only
-            npm ci
-            npm run build
-            pm2 reload quran-school --update-env
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Deploy to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 600 /dev/stdin deploy_key <<< "$VPS_SSH_KEY"
+          SSH="ssh -i deploy_key -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          $SSH "cd /root/quran-school-quizes && git pull --ff-only && npm ci"
+          rsync -az --delete --exclude cache -e "ssh -i deploy_key -o StrictHostKeyChecking=no" .next/ $VPS_USER@$VPS_HOST:/root/quran-school-quizes/.next/
+          $SSH "pm2 reload quran-school --update-env"
