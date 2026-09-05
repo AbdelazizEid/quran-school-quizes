@@ -428,14 +428,9 @@ function requestBody(model: string, request: AiQuizProviderRequest): Record<stri
       { role: "system", content: systemInstructionsFor(request.sourcePolicy) },
       { role: "user", content: requestInput(request) },
     ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "ai_quiz_draft_response",
-        strict: true,
-        schema: responseSchema,
-      },
-    },
+    // Z.AI documents json_object only; the schema contract travels in the
+    // system message (see systemInstructionsFor).
+    response_format: { type: "json_object" },
   };
 }
 
