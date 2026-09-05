@@ -67,7 +67,7 @@ function Bubble({
   const drifting = !reduced;
 
   return (
-    <motion.div layout transition={{ type: "spring", stiffness: 230, damping: 26 }}>
+    <motion.div layout="position" transition={{ type: "spring", stiffness: 230, damping: 26 }}>
       <motion.div
         animate={{ ...scatter, scale: tone === "deflated" ? 0.88 : 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 22 }}
@@ -81,7 +81,7 @@ function Bubble({
           transition={{ duration: drift.duration, repeat: Infinity, ease: "easeInOut", delay: drift.delay }}
         >
           <div
-            className={`relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-2 text-center ${toneFace[tone]}`}
+            className={`relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-2 text-center transition-[background-color,border-color,color,opacity] duration-500 ease-out ${toneFace[tone]}`}
           >
             {(person.streak ?? 0) >= 2 && tone !== "deflated" && <Flame />}
             {points && (
@@ -163,8 +163,6 @@ export function Bubbles({
 
   return (
     <motion.ul
-      layout
-      transition={{ type: "spring", stiffness: 230, damping: 26 }}
       aria-label={ariaLabel}
       className={`flex list-none flex-wrap items-center justify-center ${
         variant === "float" ? "gap-x-16 gap-y-14 py-14" : "gap-x-3 gap-y-3 py-3"
