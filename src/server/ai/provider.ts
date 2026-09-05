@@ -289,8 +289,9 @@ function parseQuestion(value: unknown, allowedKinds: QuestionKind[], request: Ai
 }
 
 /** Coerce per-kind option shapes the model may drift on (INPUT must carry no
- * options, TRUE_FALSE is exactly صح/خطأ) while preserving the evidence
- * payload; hard limits stay with the shared validator. */
+ * options, TRUE_FALSE is exactly صح/خطأ, MCQ bounded to 4 with one correct)
+ * while preserving the evidence payload; hard limits stay with the shared
+ * validator. */
 function normalizeModelQuestion(question: DraftQuestion): DraftQuestion {
   if (question.kind === "INPUT") return { ...question, options: [] };
   if (question.kind === "TRUE_FALSE") {
@@ -301,6 +302,18 @@ function normalizeModelQuestion(question: DraftQuestion): DraftQuestion {
         { text: "صح", isCorrect: isTrueCorrect },
         { text: "خطأ", isCorrect: !isTrueCorrect },
       ],
+    };
+  }
+  if (question.kind === "MCQ") {
+    const options = question.options.slice(0, 4).map((option) => ({ ...option, isCorrect: option.isCorrect === true }));
+    let firstCorrect = options.findIndex((option) => option.isCorrect);
+    if (firstCorrect === -1) {
+      options[0] = { ...options[0], isCorrect: true };
+      firstCorrect = 0;
+    }
+    return {
+      ...question,
+      options: options.map((option, index) => (index === firstCorrect ? option : { ...option, isCorrect: false })),
     };
   }
   return question;
@@ -511,7 +524,7 @@ export class GlmAiQuizProvider implements AiQuizProvider {
         return parseProviderResponse(parseJsonText(extracted.text), request);
       } catch (error) {
         if (error instanceof AiQuizProviderError && error.code === "malformed-response") {
-          console.warn("GLM quiz draft rejected (malformed-response):", extracted.text.slice(0, 400));
+          console.warn("GLM quiz draft rejected (malformed-response):", extracted.text.slice(0, 1500));
         }
         throw error;
       }
