@@ -8,7 +8,7 @@ import type { DraftQuestion, QuestionKind, SourcePolicy } from "@/lib/ai-quiz-dr
 
 export const DEFAULT_GLM_MODEL = "glm-5.3-flash";
 export const DEFAULT_GLM_BASE_URL = "https://api.z.ai/api/paas/v4";
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 90_000;
 
 export type AiQuizProviderMode = "initial" | "targeted" | "new-set";
 
@@ -129,8 +129,7 @@ const questionSchema = {
   required: ["kind", "text", "timeLimitSec", "options", "sourceEvidence"],
 } as const;
 
-const responseSchema = {
-  type: "object",
+const responseSchema = {  type: "object",
   additionalProperties: false,
   properties: {
     type: { type: "string", enum: ["clarification", "draft", "revision", "unsupported"] },
@@ -186,6 +185,10 @@ function systemInstructionsFor(policy: SourcePolicy): string {
     "استخدم clarification فقط إذا كانت التعليمات غير كافية لتحديد النطاق، واستخدم unsupported إذا كان الطلب غير مناسب لإنشاء أسئلة.",
     "في المراجعة الموجهة استخدم revision، وحدد أرقام الأسئلة المتأثرة فقط في changes، وأعد السؤال الكامل لكل تغيير.",
     "في المراجعة الموجهة لا تغيّر الأسئلة غير المذكورة ولا العنوان أو الوصف.",
+    // The GLM endpoint does not enforce response_format json_schema, so the
+    // contract travels in the prompt; keep it verbatim so output stays parseable.
+    "أخرج كائن JSON واحدًا فقط يطابق هذا المخطط حرفيًا (المفاتيح والقيم كما هي، بلا Markdown):",
+    JSON.stringify(responseSchema),
   ].join("\n");
 }
 
