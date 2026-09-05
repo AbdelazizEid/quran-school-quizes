@@ -185,6 +185,7 @@ function systemInstructionsFor(policy: SourcePolicy): string {
     "استخدم clarification فقط إذا كانت التعليمات غير كافية لتحديد النطاق، واستخدم unsupported إذا كان الطلب غير مناسب لإنشاء أسئلة.",
     "في المراجعة الموجهة استخدم revision، وحدد أرقام الأسئلة المتأثرة فقط في changes، وأعد السؤال الكامل لكل تغيير.",
     "في المراجعة الموجهة لا تغيّر الأسئلة غير المذكورة ولا العنوان أو الوصف.",
+    'قواعد لكل نوع: في MCQ من خيارين إلى أربعة خيارات بإجابة صحيحة واحدة بالضبط؛ في TRUE_FALSE يجب أن تكون options بالضبط: [{"text":"صح","isCorrect":true},{"text":"خطأ","isCorrect":false}] أو بعكس isCorrect مع بقاء إجابة صحيحة واحدة؛ في INPUT يجب أن تكون options مصفوفة فارغة []؛ وtimeLimitSec عدد صحيح بين 5 و120.',
     // The GLM endpoint does not enforce response_format json_schema, so the
     // contract travels in the prompt; keep it verbatim so output stays parseable.
     "أخرج كائن JSON واحدًا فقط يطابق هذا المخطط حرفيًا (المفاتيح والقيم كما هي، بلا Markdown):",
@@ -287,6 +288,24 @@ function parseQuestion(value: unknown, allowedKinds: QuestionKind[], request: Ai
   };
 }
 
+/** Coerce per-kind option shapes the model may drift on (INPUT must carry no
+ * options, TRUE_FALSE is exactly صح/خطأ) while preserving the evidence
+ * payload; hard limits stay with the shared validator. */
+function normalizeModelQuestion(question: DraftQuestion): DraftQuestion {
+  if (question.kind === "INPUT") return { ...question, options: [] };
+  if (question.kind === "TRUE_FALSE") {
+    const isTrueCorrect = question.options.find((option) => option.isCorrect)?.text !== "خطأ";
+    return {
+      ...question,
+      options: [
+        { text: "صح", isCorrect: isTrueCorrect },
+        { text: "خطأ", isCorrect: !isTrueCorrect },
+      ],
+    };
+  }
+  return question;
+}
+
 function parseRevision(value: RecordValue, request: AiQuizProviderRequest): AiQuizProviderResponse {
   const message = requiredArabicText(value.message);
   const currentQuestions = request.currentDraft?.questions;
@@ -305,7 +324,7 @@ function parseRevision(value: RecordValue, request: AiQuizProviderRequest): AiQu
     if (questionIndex < 0 || questionIndex >= currentQuestions.length || !question) {
       throw new AiQuizProviderError("malformed-response");
     }
-    if (!validateQuizDraft({ title: "مسودة", description: "", questions: [question] }).valid) {
+    if (!validateQuizDraft({ title: "مسودة", description: "", questions: [normalizeModelQuestion(question)] }).valid) {
       throw new AiQuizProviderError("malformed-response");
     }
     seen.add(questionIndex);
@@ -336,7 +355,8 @@ function parseProviderResponse(value: unknown, request: AiQuizProviderRequest): 
   const questions = value.questions.map((question) => parseQuestion(question, request.allowedKinds, request));
   if (questions.some((question) => question === null)) throw new AiQuizProviderError("malformed-response");
 
-  const draft = { title, description, questions: questions as DraftQuestion[] };
+  // Coerce known kind-shape drift before the shared validator judges the draft.
+  const draft = { title, description, questions: (questions as DraftQuestion[]).map(normalizeModelQuestion) };
   if (!validateQuizDraft(draft).valid) throw new AiQuizProviderError("malformed-response");
   return { type: "draft", ...draft };
 }
@@ -487,7 +507,14 @@ export class GlmAiQuizProvider implements AiQuizProvider {
         return { type: "unsupported", message: "لا يمكن إعداد هذه المسودة وفق الطلب المتاح." } as const;
       }
       if (!extracted.text) throw new AiQuizProviderError("malformed-response");
-      return parseProviderResponse(parseJsonText(extracted.text), request);
+      try {
+        return parseProviderResponse(parseJsonText(extracted.text), request);
+      } catch (error) {
+        if (error instanceof AiQuizProviderError && error.code === "malformed-response") {
+          console.warn("GLM quiz draft rejected (malformed-response):", extracted.text.slice(0, 400));
+        }
+        throw error;
+      }
     })();
 
     try {

@@ -131,7 +131,8 @@ test("the GLM request includes extracted source text only when the policy allows
     assert(body.includes("درس-الفاتحة.pdf"));
     // Extracted text only — never raw file bytes or base64 payloads.
     assert(!body.includes("application/pdf"));
-    assert(body.length < sourceText.length * 4 + 4000);
+    // Slack covers the fixed prompt (instructions + response schema + rules).
+    assert(body.length < sourceText.length * 4 + 9000);
   }
 });
 
