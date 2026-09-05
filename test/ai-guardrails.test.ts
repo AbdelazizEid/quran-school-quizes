@@ -13,7 +13,7 @@ import {
   retryAfterSeconds,
   totalSourceChars,
 } from "../src/server/ai/limits";
-import { DeterministicFakeAiQuizProvider, OpenCodeGoAiQuizProvider } from "../src/server/ai/provider";
+import { DeterministicFakeAiQuizProvider, GlmAiQuizProvider } from "../src/server/ai/provider";
 
 test("guardrail values come from the environment with sensible defaults", () => {
   assert.equal(generationsPerHour({}), DEFAULT_GENERATIONS_PER_HOUR);
@@ -60,7 +60,7 @@ test("the concurrent-generation slot is per Teacher and always releasable", () =
 });
 
 test("only the real provider is metered; the fake never spends allowance", () => {
-  assert.equal(new OpenCodeGoAiQuizProvider({ apiKey: "k", fetch: async () => { throw new Error("unused"); } }).metered, true);
+  assert.equal(new GlmAiQuizProvider({ apiKey: "k", fetch: async () => { throw new Error("unused"); } }).metered, true);
   assert.equal(new DeterministicFakeAiQuizProvider().metered, false);
 });
 

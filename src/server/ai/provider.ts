@@ -6,8 +6,8 @@ import {
 } from "@/lib/ai-quiz-draft";
 import type { DraftQuestion, QuestionKind, SourcePolicy } from "@/lib/ai-quiz-draft";
 
-export const DEFAULT_OPENCODE_GO_MODEL = "gpt-5.6-luna";
-export const DEFAULT_OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1/responses";
+export const DEFAULT_GLM_MODEL = "glm-5.3-flash";
+export const DEFAULT_GLM_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export type AiQuizProviderMode = "initial" | "targeted" | "new-set";
@@ -72,12 +72,12 @@ export class AiQuizProviderError extends Error {
   readonly status: number;
 
   constructor(readonly code: AiQuizProviderErrorCode) {
-    super(`OpenCode Go provider ${code}`);
+    super(`GLM provider ${code}`);
     this.status = errorStatus[code];
   }
 }
 
-export type OpenCodeGoProviderOptions = {
+export type GlmProviderOptions = {
   apiKey?: string;
   model?: string;
   baseUrl?: string;
@@ -87,10 +87,10 @@ export type OpenCodeGoProviderOptions = {
 
 type AiProviderEnvironment = {
   [key: string]: string | undefined;
-  OPENCODE_GO_API_KEY?: string;
-  OPENCODE_GO_MODEL?: string;
-  OPENCODE_GO_BASE_URL?: string;
-  OPENCODE_GO_TIMEOUT_MS?: string;
+  GLM_API_KEY?: string;
+  GLM_MODEL?: string;
+  GLM_BASE_URL?: string;
+  GLM_TIMEOUT_MS?: string;
 };
 
 const questionSchema = {
@@ -208,9 +208,9 @@ function configuredTimeoutFromEnv(value: string | undefined): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
 }
 
-function responsesEndpoint(value: string): string {
+function chatCompletionsEndpoint(value: string): string {
   const endpoint = value.replace(/\/+$/, "");
-  return endpoint.endsWith("/responses") ? endpoint : `${endpoint}/responses`;
+  return endpoint.endsWith("/chat/completions") ? endpoint : `${endpoint}/chat/completions`;
 }
 
 function isArabicText(value: string): boolean {
@@ -339,29 +339,14 @@ function parseProviderResponse(value: unknown, request: AiQuizProviderRequest): 
 }
 
 function responseText(payload: unknown): { text: string; refused: boolean } {
-  if (!isRecord(payload)) throw new AiQuizProviderError("malformed-response");
-  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
-    return { text: payload.output_text, refused: false };
-  }
-
-  if (!Array.isArray(payload.output)) throw new AiQuizProviderError("malformed-response");
+  if (!isRecord(payload) || !Array.isArray(payload.choices)) throw new AiQuizProviderError("malformed-response");
   const textParts: string[] = [];
   let refused = false;
 
-  for (const item of payload.output) {
-    if (!isRecord(item)) continue;
-    if (item.type === "refusal") refused = true;
-    if (item.type === "output_text" && typeof item.text === "string") textParts.push(item.text);
-    if (item.type !== "message") continue;
-    if (typeof item.content === "string") textParts.push(item.content);
-    if (!Array.isArray(item.content)) continue;
-    for (const content of item.content) {
-      if (!isRecord(content)) continue;
-      if (content.type === "refusal") refused = true;
-      if ((content.type === "output_text" || content.type === "text") && typeof content.text === "string") {
-        textParts.push(content.text);
-      }
-    }
+  for (const choice of payload.choices) {
+    if (!isRecord(choice)) continue;
+    if (choice.finish_reason === "sensitive_content_blocked") refused = true;
+    if (isRecord(choice.message) && typeof choice.message.content === "string") textParts.push(choice.message.content);
   }
 
   return { text: textParts.join("\n").trim(), refused };
@@ -436,11 +421,13 @@ function requestInput(request: AiQuizProviderRequest): string {
 function requestBody(model: string, request: AiQuizProviderRequest): Record<string, unknown> {
   return {
     model,
-    instructions: systemInstructionsFor(request.sourcePolicy),
-    input: requestInput(request),
-    text: {
-      format: {
-        type: "json_schema",
+    messages: [
+      { role: "system", content: systemInstructionsFor(request.sourcePolicy) },
+      { role: "user", content: requestInput(request) },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
         name: "ai_quiz_draft_response",
         strict: true,
         schema: responseSchema,
@@ -449,7 +436,7 @@ function requestBody(model: string, request: AiQuizProviderRequest): Record<stri
   };
 }
 
-export class OpenCodeGoAiQuizProvider implements AiQuizProvider {
+export class GlmAiQuizProvider implements AiQuizProvider {
   readonly metered = true;
 
   private readonly apiKey: string;
@@ -458,13 +445,13 @@ export class OpenCodeGoAiQuizProvider implements AiQuizProvider {
   private readonly timeoutMs: number;
   private readonly fetcher: typeof fetch | undefined;
 
-  constructor(options: OpenCodeGoProviderOptions = {}) {
-    this.apiKey = configuredValue(options.apiKey ?? process.env.OPENCODE_GO_API_KEY, "");
-    this.model = configuredValue(options.model ?? process.env.OPENCODE_GO_MODEL, DEFAULT_OPENCODE_GO_MODEL);
-    this.endpoint = responsesEndpoint(
-      configuredValue(options.baseUrl ?? process.env.OPENCODE_GO_BASE_URL, DEFAULT_OPENCODE_GO_BASE_URL),
+  constructor(options: GlmProviderOptions = {}) {
+    this.apiKey = configuredValue(options.apiKey ?? process.env.GLM_API_KEY, "");
+    this.model = configuredValue(options.model ?? process.env.GLM_MODEL, DEFAULT_GLM_MODEL);
+    this.endpoint = chatCompletionsEndpoint(
+      configuredValue(options.baseUrl ?? process.env.GLM_BASE_URL, DEFAULT_GLM_BASE_URL),
     );
-    this.timeoutMs = configuredTimeout(options.timeoutMs ?? configuredTimeoutFromEnv(process.env.OPENCODE_GO_TIMEOUT_MS));
+    this.timeoutMs = configuredTimeout(options.timeoutMs ?? configuredTimeoutFromEnv(process.env.GLM_TIMEOUT_MS));
     this.fetcher = options.fetch ?? globalThis.fetch;
   }
 
@@ -645,13 +632,13 @@ export class DeterministicFakeAiQuizProvider implements AiQuizProvider {
 }
 
 export function getAiQuizProvider(env: AiProviderEnvironment = process.env): AiQuizProvider {
-  const apiKey = env.OPENCODE_GO_API_KEY?.trim();
+  const apiKey = env.GLM_API_KEY?.trim();
   if (!apiKey) return new DeterministicFakeAiQuizProvider();
 
-  return new OpenCodeGoAiQuizProvider({
+  return new GlmAiQuizProvider({
     apiKey,
-    model: env.OPENCODE_GO_MODEL,
-    baseUrl: env.OPENCODE_GO_BASE_URL,
-    timeoutMs: configuredTimeoutFromEnv(env.OPENCODE_GO_TIMEOUT_MS),
+    model: env.GLM_MODEL,
+    baseUrl: env.GLM_BASE_URL,
+    timeoutMs: configuredTimeoutFromEnv(env.GLM_TIMEOUT_MS),
   });
 }

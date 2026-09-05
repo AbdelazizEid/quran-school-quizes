@@ -8,7 +8,7 @@ Teachers currently need to create every Question in a Quiz manually. Preparing a
 
 Add a private, resumable AI Quiz Draft Conversation to the Teacher Dashboard. A Teacher can provide one or more documents, pasted text, and an instruction; choose how the AI uses sources; receive an Arabic-only draft; request targeted revisions; edit Questions directly; inspect Source Evidence; and explicitly save the approved draft as a normal Quiz.
 
-The AI is a drafting assistant, not the publisher of a Quiz. The application owns the conversation and draft state. OpenCode Go is only the server-side model provider.
+The AI is a drafting assistant, not the publisher of a Quiz. The application owns the conversation and draft state. GLM is only the server-side model provider.
 
 ## User Stories
 
@@ -57,9 +57,9 @@ The AI is a drafting assistant, not the publisher of a Quiz. The application own
 
 - The highest seam is one server-side AI Quiz Draft Conversation service. It owns draft state, source policy, conversation turns, AI Revisions, direct-edit application, cleanup, and final-save preparation.
 - Authenticated Next route handlers provide the Teacher boundary and delegate to that service. Every read and write is scoped to the current Teacher, following the existing ownership pattern.
-- A provider adapter hides OpenCode Go’s model-specific endpoint and response format. The application does not expose provider credentials or model selection to the browser.
-- The application owns conversation state. OpenCode Go is a stateless model provider for this feature, not the source of truth for drafts or messages.
-- One OpenCode Go model is selected after an Arabic/Quran evaluation and configured through the server environment. The model must be replaceable without changing the Teacher UI.
+- A provider adapter hides GLM’s model-specific endpoint and response format. The application does not expose provider credentials or model selection to the browser.
+- The application owns conversation state. GLM is a stateless model provider for this feature, not the source of truth for drafts or messages.
+- One GLM model is selected after an Arabic/Quran evaluation and configured through the server environment. The model must be replaceable without changing the Teacher UI.
 - The API key is server-only. Extracted source text and Teacher instructions may be sent to the configured provider; original source files stay on the school VPS until draft cleanup.
 - Source Policy has exactly three choices: General knowledge only (default), Uploaded sources only, and Uploaded sources plus general knowledge.
 - Generated content is Arabic-only, regardless of the language of the interface input or source document.
@@ -85,7 +85,7 @@ The AI is a drafting assistant, not the publisher of a Quiz. The application own
 - Tests must exercise externally visible behavior through route handlers and the Teacher-facing UI; they should not assert private helper structure or provider SDK internals.
 - Add route-level tests for draft ownership, Source Policy handling, source add/remove, clarification responses, initial generation, targeted revisions, direct edits, apply/discard, save, and cleanup.
 - Add validation tests proving malformed AI output cannot save a Quiz: missing title, empty Question text, invalid kinds, too many options, zero or multiple MCQ correct answers, and INPUT options.
-- Add provider-boundary tests with a deterministic fake provider so normal tests do not spend OpenCode Go allowance or depend on network availability.
+- Add provider-boundary tests with a deterministic fake provider so normal tests do not spend GLM allowance or depend on network availability.
 - Add tests that verify the server sends extracted text and instructions only when the selected Source Policy allows it, and never sends the original file object to the provider adapter.
 - Add tests for general-knowledge labeling, source evidence retention, missing-source handling, and unsupported requests.
 - Add tests for source-file and conversation deletion on save and discard, including failure handling that does not leave a saved Quiz without its expected final state.
@@ -107,12 +107,12 @@ The AI is a drafting assistant, not the publisher of a Quiz. The application own
 - Automatic grading of INPUT answers; the existing Teacher review behavior remains unchanged.
 - AI-generated explanations shown to Students during a Quiz.
 - Multi-model voting, automatic fact-checking by a second model, or ensemble generation.
-- Billing, subscription management, or a per-Teacher OpenCode Go account.
+- Billing, subscription management, or a per-Teacher GLM account.
 - Streaming partial Questions into the draft preview.
 
 ## Further Notes
 
-- OpenCode Go exposes different API endpoint formats depending on the selected model. The provider adapter must be chosen after the Arabic/Quran model evaluation rather than assuming one universal endpoint.
+- GLM exposes different API endpoint formats depending on the selected model. The provider adapter must be chosen after the Arabic/Quran model evaluation rather than assuming one universal endpoint.
 - General knowledge only is intentionally the default. The active Source Policy and supplemental labels must be prominent because this is less restrictive than source-only generation.
 - Source Evidence remains after the original file is deleted, so it is provenance for review rather than a guarantee that the original document can be reopened.
 - The existing Quiz API currently accepts Question data without complete semantic validation. The new save boundary must close that gap for AI-created content and should be reusable by manual Quiz creation where practical.

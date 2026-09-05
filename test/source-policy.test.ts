@@ -4,7 +4,7 @@ import { SUPPLEMENTAL_LABEL, SOURCE_POLICY_LABEL } from "../src/lib/ai-quiz-draf
 import type { DraftQuestion } from "../src/lib/ai-quiz-draft";
 import {
   DeterministicFakeAiQuizProvider,
-  OpenCodeGoAiQuizProvider,
+  GlmAiQuizProvider,
 } from "../src/server/ai/provider";
 import type { AiQuizProviderRequest, AiQuizProviderSource } from "../src/server/ai/provider";
 
@@ -99,18 +99,22 @@ function draftBody(evidence: unknown) {
   };
 }
 
-test("the OpenCode Go request includes extracted source text only when the policy allows it", async () => {
+function chatResponse(body: unknown): Response {
+  return jsonResponse({ choices: [{ message: { content: JSON.stringify(body) } }] });
+}
+
+test("the GLM request includes extracted source text only when the policy allows it", async () => {
   async function sentInputFor(policy: AiQuizProviderRequest["sourcePolicy"]): Promise<string> {
     const evidence =
       policy === "GENERAL_KNOWLEDGE_ONLY"
         ? null
         : { type: "source", label: "من المصدر المرفوع", documentName: "درس-الفاتحة.pdf", excerpt: "سورة الفاتحة" };
     let sentBody = "";
-    const provider = new OpenCodeGoAiQuizProvider({
+    const provider = new GlmAiQuizProvider({
       apiKey: "test-key",
       fetch: async (_input, init) => {
         sentBody = String(init?.body);
-        return jsonResponse({ output_text: JSON.stringify(draftBody(evidence)) });
+        return chatResponse(draftBody(evidence));
       },
     });
     await provider.generate(baseRequest({ sourcePolicy: policy, sources, questionCount: 1 }));
@@ -131,11 +135,11 @@ test("the OpenCode Go request includes extracted source text only when the polic
   }
 });
 
-test("the OpenCode Go adapter accepts source evidence only for known sources", async () => {
+test("the GLM adapter accepts source evidence only for known sources", async () => {
   async function generateWith(evidence: unknown) {
-    const provider = new OpenCodeGoAiQuizProvider({
+    const provider = new GlmAiQuizProvider({
       apiKey: "test-key",
-      fetch: async () => jsonResponse({ output_text: JSON.stringify(draftBody(evidence)) }),
+      fetch: async () => chatResponse(draftBody(evidence)),
     });
     return provider.generate(baseRequest({ sourcePolicy: "SOURCES_ONLY", sources, questionCount: 1 }));
   }

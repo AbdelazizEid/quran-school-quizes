@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  DEFAULT_OPENCODE_GO_BASE_URL,
-  DEFAULT_OPENCODE_GO_MODEL,
+  DEFAULT_GLM_BASE_URL,
+  DEFAULT_GLM_MODEL,
   AiQuizProviderError,
   DeterministicFakeAiQuizProvider,
-  OpenCodeGoAiQuizProvider,
+  GlmAiQuizProvider,
   getAiQuizProvider,
 } from "../src/server/ai/provider";
 import { DEFAULT_SOURCE_POLICY } from "../src/lib/ai-quiz-draft";
@@ -46,33 +46,32 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-test("OpenCode Go uses the configured Responses endpoint and returns a structured Arabic draft", async () => {
+function chatResponse(body: unknown): Response {
+  return jsonResponse({ choices: [{ message: { content: JSON.stringify(body) } }] });
+}
+
+test("GLM uses the configured Chat Completions endpoint and returns a structured Arabic draft", async () => {
   let calledUrl = "";
   let calledInit: RequestInit | undefined;
-  const provider = new OpenCodeGoAiQuizProvider({
+  const provider = new GlmAiQuizProvider({
     apiKey: "test-key",
     fetch: async (input, init) => {
       calledUrl = String(input);
       calledInit = init;
-      return jsonResponse({
-        output: [
-          { type: "reasoning", summary: [{ type: "summary_text", text: "ignored" }] },
-          {
-            type: "message",
-            content: [{ type: "output_text", text: JSON.stringify(responseBody()) }],
-          },
-        ],
-      });
+      return chatResponse(responseBody());
     },
   });
 
   const result = await provider.generate(request);
-  const sentBody = JSON.parse(String(calledInit?.body)) as Record<string, unknown>;
+  const sentBody = JSON.parse(String(calledInit?.body)) as {
+    model: string;
+    messages: { role: string; content: string }[];
+  };
 
-  assert.equal(calledUrl, DEFAULT_OPENCODE_GO_BASE_URL);
-  assert.equal(sentBody.model, DEFAULT_OPENCODE_GO_MODEL);
-  assert.match(String(sentBody.instructions), /العربية/);
-  assert(String(sentBody.input).includes(request.instruction));
+  assert.equal(calledUrl, `${DEFAULT_GLM_BASE_URL}/chat/completions`);
+  assert.equal(sentBody.model, DEFAULT_GLM_MODEL);
+  assert.match(sentBody.messages[0].content, /العربية/);
+  assert(sentBody.messages[1].content.includes(request.instruction));
   assert.equal((calledInit?.headers as Record<string, string>).Authorization, "Bearer test-key");
   assert.deepEqual(result, {
     type: "draft",
@@ -93,10 +92,10 @@ test("OpenCode Go uses the configured Responses endpoint and returns a structure
   });
 });
 
-test("OpenCode Go reads top-level output_text and structured clarification responses", async () => {
-  const provider = new OpenCodeGoAiQuizProvider({
+test("GLM reads the chat completion content and structured clarification responses", async () => {
+  const provider = new GlmAiQuizProvider({
     apiKey: "test-key",
-    fetch: async () => jsonResponse({ output_text: JSON.stringify({ type: "clarification", message: "ما السورة المطلوبة؟" }) }),
+    fetch: async () => chatResponse({ type: "clarification", message: "ما السورة المطلوبة؟" }),
   });
 
   assert.deepEqual(await provider.generate(request), {
@@ -105,7 +104,7 @@ test("OpenCode Go reads top-level output_text and structured clarification respo
   });
 });
 
-test("OpenCode Go parses a targeted revision against the current draft", async () => {
+test("GLM parses a targeted revision against the current draft", async () => {
   const currentQuestion = responseBody().questions[0] as DraftQuestion;
   const targetedRequest: AiQuizProviderRequest = {
     ...request,
@@ -116,25 +115,23 @@ test("OpenCode Go parses a targeted revision against the current draft", async (
       questions: [{ ...currentQuestion, timeLimitSec: 20 }],
     },
   };
-  const provider = new OpenCodeGoAiQuizProvider({
+  const provider = new GlmAiQuizProvider({
     apiKey: "test-key",
     fetch: async (_input, init) => {
       assert(String(init?.body).includes("سورة الفاتحة"));
-      return jsonResponse({
-        output_text: JSON.stringify({
-          type: "revision",
-          message: "اقترحت تحسين السؤال الأول.",
-          changes: [
-            {
-              questionIndex: 0,
-              question: {
-                ...currentQuestion,
-                text: "ما عدد آيات سورة الفاتحة بعد التحسين؟",
-                sourceEvidence: null,
-              },
+      return chatResponse({
+        type: "revision",
+        message: "اقترحت تحسين السؤال الأول.",
+        changes: [
+          {
+            questionIndex: 0,
+            question: {
+              ...currentQuestion,
+              text: "ما عدد آيات سورة الفاتحة بعد التحسين؟",
+              sourceEvidence: null,
             },
-          ],
-        }),
+          },
+        ],
       });
     },
   });
@@ -165,7 +162,7 @@ test("provider failures are classified without exposing the upstream response", 
     [401, "authentication"],
     [429, "rate-limit"],
   ] as const) {
-    const provider = new OpenCodeGoAiQuizProvider({
+    const provider = new GlmAiQuizProvider({
       apiKey: "test-key",
       fetch: async () => jsonResponse({ secret: "must-not-leak" }, status),
     });
@@ -180,21 +177,21 @@ test("provider failures are classified without exposing the upstream response", 
 });
 
 test("malformed or non-Arabic model output is rejected", async () => {
-  const malformed = new OpenCodeGoAiQuizProvider({
+  const malformed = new GlmAiQuizProvider({
     apiKey: "test-key",
-    fetch: async () => jsonResponse({ output_text: "not json" }),
+    fetch: async () => chatResponse("not json"),
   });
   await assert.rejects(malformed.generate(request), { code: "malformed-response" });
 
-  const nonArabic = new OpenCodeGoAiQuizProvider({
+  const nonArabic = new GlmAiQuizProvider({
     apiKey: "test-key",
-    fetch: async () => jsonResponse({ output_text: JSON.stringify({ ...responseBody(), title: "English title" }) }),
+    fetch: async () => chatResponse(JSON.stringify({ ...responseBody(), title: "English title" })),
   });
   await assert.rejects(nonArabic.generate(request), { code: "malformed-response" });
 });
 
 test("a provider timeout is retryable and does not make another network call", async () => {
-  const provider = new OpenCodeGoAiQuizProvider({
+  const provider = new GlmAiQuizProvider({
     apiKey: "test-key",
     timeoutMs: 5,
     fetch: async () => new Promise<Response>(() => undefined),
@@ -208,6 +205,6 @@ test("a provider timeout is retryable and does not make another network call", a
 });
 
 test("the configured provider is opt-in and the deterministic fake is the no-key default", () => {
-  assert(getAiQuizProvider({ OPENCODE_GO_API_KEY: "" }) instanceof DeterministicFakeAiQuizProvider);
-  assert(getAiQuizProvider({ OPENCODE_GO_API_KEY: "test-key" }) instanceof OpenCodeGoAiQuizProvider);
+  assert(getAiQuizProvider({ GLM_API_KEY: "" }) instanceof DeterministicFakeAiQuizProvider);
+  assert(getAiQuizProvider({ GLM_API_KEY: "test-key" }) instanceof GlmAiQuizProvider);
 });

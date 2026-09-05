@@ -7,7 +7,7 @@ import {
   generalKnowledgeEvidence,
   sourceEvidence,
 } from "../src/lib/ai-quiz-draft";
-import { OpenCodeGoAiQuizProvider } from "../src/server/ai/provider";
+import { GlmAiQuizProvider } from "../src/server/ai/provider";
 import type { AiQuizProviderRequest } from "../src/server/ai/provider";
 
 const request: AiQuizProviderRequest = {
@@ -40,9 +40,10 @@ function draftWith(evidence: unknown) {
 }
 
 function providerReturning(body: unknown) {
-  return new OpenCodeGoAiQuizProvider({
+  return new GlmAiQuizProvider({
     apiKey: "test-key",
-    fetch: async () => new Response(JSON.stringify({ output_text: JSON.stringify(body) }), { status: 200 }),
+    fetch: async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(body) } }] }), { status: 200 }),
   });
 }
 
@@ -88,7 +89,7 @@ test("compact Source Evidence falls back to the supplemental marker for missing 
   }
 });
 
-test("the OpenCode Go adapter parses a page or section reference on source evidence", async () => {
+test("the GLM adapter parses a page or section reference on source evidence", async () => {
   const response = await providerReturning(
     draftWith({
       type: "source",
