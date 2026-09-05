@@ -40,6 +40,12 @@ export const sfx = {
   join() {
     note(523.25, 0, 0.09, 0.045);
   },
+  answer() {
+    // short blip as a bubble turns lit; slight pitch variance so a burst of
+    // answers feels alive instead of a machine-gun single tone
+    const p = 1 + (Math.random() * 0.12 - 0.06);
+    note(740 * p, 0, 0.07, 0.04, "triangle");
+  },
   fanfare() {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => note(f, i * 0.12, 0.25));
   },

@@ -67,7 +67,7 @@ function Bubble({
   const drifting = !reduced;
 
   return (
-    <motion.div layout="position" transition={{ type: "spring", stiffness: 230, damping: 26 }}>
+    <motion.div layout="position" transition={{ type: "spring", stiffness: 150, damping: 22 }}>
       <motion.div
         animate={{ ...scatter, scale: tone === "deflated" ? 0.88 : 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 22 }}
@@ -80,7 +80,9 @@ function Bubble({
           }
           transition={{ duration: drift.duration, repeat: Infinity, ease: "easeInOut", delay: drift.delay }}
         >
-          <div
+          <motion.div
+            layoutId={`podium:${person.id}`}
+            transition={{ type: "spring", stiffness: 55, damping: 17 }}
             className={`relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-2 text-center transition-[background-color,border-color,color,opacity] duration-500 ease-out ${toneFace[tone]}`}
           >
             {(person.streak ?? 0) >= 2 && tone !== "deflated" && <Flame />}
@@ -112,7 +114,7 @@ function Bubble({
             <span className="max-w-[58px] truncate px-1 text-xs font-semibold leading-snug">
               {person.nickname}
             </span>
-          </div>
+          </motion.div>
         </motion.div>
       </motion.div>
     </motion.div>
@@ -178,8 +180,9 @@ export function Bubbles({
 }
 
 /**
- * The top three lifted out of the strip: same orbs, rank plate and score
- * beneath. 3rd → 2nd → 1st, star on first.
+ * The top three lifted out of the strip: the strip bubbles themselves fly down
+ * (shared layoutId), the rank plate and score land beneath them after they
+ * settle. 3rd → 2nd → 1st, star on first.
  */
 export function BubblePodium({ rows }: { rows: BubblePerson[] }) {
   const reduced = useReducedMotion();
@@ -193,56 +196,65 @@ export function BubblePodium({ rows }: { rows: BubblePerson[] }) {
     "border-[color:var(--lapis)] text-[color:var(--lapis)]",
     "border-[color:var(--rule)] text-[color:var(--muted-ink)]",
   ];
+  const orbSizes = ["h-32 w-32", "h-[108px] w-[108px]", "h-[92px] w-[92px]"];
+  const nameWidths = ["max-w-[104px]", "max-w-[84px]", "max-w-[68px]"];
+  const nameSizes = ["text-base", "text-sm", "text-sm"];
 
   return (
     <div className="flex items-end justify-center gap-4 sm:gap-10" aria-label="منصة الفائزين">
       {order.map((rank) => {
         const p = top[rank];
-        const delay = delays[rank] ?? 0;
+        const delay = 0.9 + (delays[rank] ?? 0);
         return (
-          <motion.div
-            key={p.id}
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 70 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay, duration: 0.6, ease: EASE }}
-            className="flex flex-col items-center gap-2"
-          >
-            {rank === 0 && <Star reduced={reduced} />}
-            <div
-              className={`relative flex h-24 w-24 items-center justify-center rounded-full border-2 bg-[color:var(--wash)] text-center ${
+          <div key={p.id} className="flex flex-col items-center gap-2">
+            {rank === 0 && <Star delay={delay} />}
+            <motion.div
+              layoutId={reduced ? undefined : `podium:${p.id}`}
+              initial={reduced ? { opacity: 0 } : false}
+              animate={reduced ? { opacity: 1 } : undefined}
+              transition={{ type: "spring", stiffness: 55, damping: 17 }}
+              className={`relative flex items-center justify-center rounded-full border-2 bg-[color:var(--wash)] text-center ${orbSizes[rank]} ${
                 plates[rank].split(" ")[0]
               }`}
             >
               {(p.streak ?? 0) >= 2 && <Flame />}
-              <span className="max-w-[76px] truncate px-1 text-sm font-bold leading-snug">
+              <span className={`truncate px-1 font-bold leading-snug ${nameWidths[rank]} ${nameSizes[rank]}`}>
                 {p.nickname}
               </span>
-            </div>
-            <span
+            </motion.div>
+            <motion.span
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay, duration: 0.45, ease: EASE }}
               className={`flex h-10 w-10 items-center justify-center border-2 bg-[color:var(--background)] text-xl font-bold ${plates[rank]}`}
             >
               {rank + 1}
-            </span>
-            <span className="text-xl font-bold tabular-nums text-[color:var(--foreground)]" dir="ltr">
+            </motion.span>
+            <motion.span
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: delay + 0.1, duration: 0.45, ease: EASE }}
+              className="text-xl font-bold tabular-nums text-[color:var(--foreground)]" dir="ltr"
+            >
               {p.totalScore}
-            </span>
-          </motion.div>
+            </motion.span>
+          </div>
         );
       })}
     </div>
   );
 }
 
-function Star({ reduced }: { reduced: boolean | null }) {
+function Star({ delay }: { delay: number }) {
   return (
     <motion.svg
       width="22"
       height="22"
       viewBox="0 0 18 18"
       aria-hidden="true"
-      initial={reduced ? { opacity: 0 } : { scale: 0, opacity: 0 }}
+      initial={{ scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay: 0.55, duration: 0.5, ease: "easeOut" }}
+      transition={{ delay, duration: 0.5, ease: "easeOut" }}
     >
       <path
         d="M9 1 L10.8 6.6 L16.5 7 L12.2 10.6 L13.7 16.2 L9 13.2 L4.3 16.2 L5.8 10.6 L1.5 7 L7.2 6.6 Z"

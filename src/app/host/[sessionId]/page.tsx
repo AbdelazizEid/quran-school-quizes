@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, use } from "react";
 import { io, type Socket } from "socket.io-client";
 import QRCode from "qrcode";
+import { motion, useReducedMotion } from "framer-motion";
 import type { SessionState } from "@/lib/session-state";
 import CountdownRing from "@/components/CountdownRing";
 import { Bubbles, BubblePodium, type BubblePerson, type BubbleTone } from "@/components/Bubbles";
@@ -11,10 +12,13 @@ import VoteBar from "@/components/VoteBar";
 import Confetti from "@/components/Confetti";
 import { sfx } from "@/lib/sfx";
 
+const SECTION_EASE = [0.16, 1, 0.3, 1] as const;
+
 type AnswersUpdate = NonNullable<SessionState["answers"]> & { answered: string[] };
 
 export default function HostPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
+  const reduced = useReducedMotion();
   const [state, setState] = useState<SessionState | null>(null);
   const [connected, setConnected] = useState(false);
   const [answersUpdate, setAnswersUpdate] = useState<AnswersUpdate | null>(null);
@@ -53,7 +57,7 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
     };
   }, [sessionId]);
 
-  const roster = state?.roster ?? [];
+  const roster = useMemo(() => state?.roster ?? [], [state]);
 
   // a new bubble flies in with a chime (silent before the first user gesture,
   // and on a page refresh where the roster arrives pre-populated)
@@ -80,12 +84,23 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
     }).catch(() => undefined);
   }, [state?.joinCode, state?.phase]);
 
-  const leaderboard = state?.leaderboard ?? [];
+  const leaderboard = useMemo(() => state?.leaderboard ?? [], [state]);
 
   const answeredSet = useMemo(
     () => new Set(answersUpdate?.answered ?? state?.answers?.answered ?? []),
     [answersUpdate, state]
   );
+
+  // a blip rides each bubble turning lit (same baseline logic as the join chime:
+  // silent on refresh where answers arrive pre-populated)
+  const prevAnswered = useRef(0);
+  const seenAnswered = useRef(false);
+  useEffect(() => {
+    const n = answeredSet.size;
+    if (seenAnswered.current && n > prevAnswered.current) sfx.answer();
+    seenAnswered.current = true;
+    prevAnswered.current = n;
+  }, [answeredSet]);
   const onlineSet = useMemo(() => (online === null ? null : new Set(online)), [online]);
 
   const toneFor = (p: BubblePerson): BubbleTone => {
@@ -114,6 +129,14 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
   }, [state]);
 
   const podiumPhase = state?.phase === "LEADERBOARD" || state?.phase === "CLOSED";
+
+  // the podium bubbles leave the strip so the same orbs (shared layoutId) fly
+  // down to the podium and back up on "next"
+  const podiumIds = useMemo(() => new Set(leaderboard.slice(0, 3).map((p) => p.id)), [leaderboard]);
+  const stripRoster = useMemo(
+    () => (podiumPhase ? roster.filter((p) => !podiumIds.has(p.id)) : roster),
+    [podiumPhase, roster, podiumIds]
+  );
 
   if (!state) {
     return <main className="min-h-screen p-10 text-[color:var(--muted-ink)]">جارٍ التحميل…</main>;
@@ -146,7 +169,7 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
       {/* the strip lives through the whole session; lobby = scattered, then it docks */}
       <div className="mt-6">
         <Bubbles
-          people={roster}
+          people={stripRoster}
           toneFor={toneFor}
           variant={state.phase === "LOBBY" ? "float" : "strip"}
           orderSeed={state.phase === "LOBBY" ? undefined : state.questionIndex}
@@ -170,7 +193,13 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
       )}
 
       {state.phase === "QUESTION" && state.question && (
-        <section className="mt-10 max-w-2xl mx-auto text-center">
+        <motion.section
+          key={`q-${state.questionIndex}`}
+          initial={reduced ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: reduced ? 0 : 0.25, duration: 0.6, ease: SECTION_EASE }}
+          className="mt-10 max-w-2xl mx-auto text-center"
+        >
           <div className="flex items-center justify-center gap-6">
             <CountdownRing
               startedAt={state.phaseStartedAt}
@@ -189,11 +218,17 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
               اكشف الإجابة
             </HostBtn>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {state.phase === "ANSWER_REVIEW" && state.question && (
-        <section className="mt-10 max-w-2xl mx-auto">
+        <motion.section
+          key={`r-${state.questionIndex}`}
+          initial={reduced ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: reduced ? 0 : 0.25, duration: 0.6, ease: SECTION_EASE }}
+          className="mt-10 max-w-2xl mx-auto"
+        >
           <div className="flex items-center justify-between">
             <p className="text-sm text-[color:var(--muted-ink)]">
               سؤال {state.questionIndex + 1} / {state.questionCount}
@@ -227,7 +262,7 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
           <div className="mt-10 text-center">
             <HostBtn onClick={() => hostEmit("next")}>{isLast ? "اعرض لوحة النتائج" : "التالي"}</HostBtn>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {podiumPhase && (
