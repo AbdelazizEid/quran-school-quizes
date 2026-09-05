@@ -97,3 +97,15 @@ _Avoid_: PIN, invite
 **Lobby**:
 The waiting area of a Competition Session where joined Students appear, each with a Nickname that is unique within that Session.
 _Avoid_: waiting room
+
+**Bubble** (فقاعة):
+A floating, named orb representing one Participant during a Competition Session, shown only on the host screen from the moment they join until the session ends. A Bubble never disappears mid-session; it changes state instead (lit, dimmed, asleep, deflated).
+_Avoid_: avatar, orb, chip, token
+
+**Bubble Strip**:
+The docked row of Bubbles at the top of the host screen where all Participants stay visible while a Question is live.
+_Avoid_: dock, roster bar
+
+**Bubble Podium**:
+The top-three Bubbles lifted out of the Strip to mark 1st, 2nd, and 3rd. Used for both between-question standings and the final standings.
+_Avoid_: winner board, trophy screen

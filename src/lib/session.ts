@@ -171,7 +171,7 @@ export async function submitAnswer(
 export async function distribution(sessionId: string, questionId: string) {
   const answers = await prisma.sessionAnswer.findMany({
     where: { sessionId, questionId },
-    select: { chosenOptionId: true, isCorrect: true },
+    select: { chosenOptionId: true, isCorrect: true, participantId: true },
   });
   return {
     counts: answers.reduce<Record<string, number>>((acc, a) => {
@@ -180,6 +180,9 @@ export async function distribution(sessionId: string, questionId: string) {
       return acc;
     }, {}),
     total: answers.length,
+    // participantIds who answered, so the host strip can light their bubbles
+    // (ADR 0004: who answered is public live; what they picked waits for reveal)
+    answered: [...new Set(answers.map((a) => a.participantId))],
   };
 }
 

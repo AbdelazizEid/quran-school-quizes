@@ -12,8 +12,11 @@ import {
   participants,
   distribution,
 } from "@/lib/session";
+import { createPresence } from "./presence";
 
 type SessionNS = Namespace;
+
+const presence = createPresence();
 
 export async function emitState(io: SessionNS, sessionId: string) {
   const session = await prisma.session.findUniqueOrThrow({
@@ -96,8 +99,12 @@ export async function emitState(io: SessionNS, sessionId: string) {
     ...base,
     question,
     answers,
+    // host renders the bubble strip: every participant plus the outcome of
+    // the question under review (ADR 0004: identities open at reveal)
+    results,
     roster: names,
     leaderboard: lb,
+    online: presence.online(sessionId),
   });
 }
 
@@ -157,11 +164,23 @@ export function registerSessionHandlers(io: SessionNS, sock: Socket) {
       const participant = await prisma.sessionParticipant.findUniqueOrThrow({
         where: { id: resolvedId },
       });
+      sock.data.sessionId = participant.sessionId;
       sock.join(`session:${participant.sessionId}`);
+      presence.arrive(participant.sessionId, resolvedId);
+      io.to(`host:${participant.sessionId}`).emit("presence", presence.online(participant.sessionId));
       ack?.({ ok: true, participantId: resolvedId, nickname: participant.nickname });
       setImmediate(() => {
         emitState(io, participant.sessionId).catch(() => undefined);
       });
+    });
+
+    sock.on("disconnect", () => {
+      const pid = sock.data.participantId as string | undefined;
+      const sid = sock.data.sessionId as string | undefined;
+      if (!pid || !sid) return;
+      if (presence.leave(sid, pid)) {
+        io.to(`host:${sid}`).emit("presence", presence.online(sid));
+      }
     });
 
     sock.on("answer", async (payload: { optionId: string | null; timeMs?: number }, ack?: (r: unknown) => void) => {

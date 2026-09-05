@@ -119,7 +119,7 @@ Single editorial column (max-width 72rem) on the parchment ground, RTL-first: co
 
 ## Shapes
 
-Language of the ruled line: 1px hairlines, rounded-md (12px) on interactive controls, fully-round (9999px) reserved for the medallion and dot markers. No enclosing card rectangles.
+Language of the ruled line: 1px hairlines, rounded-md (12px) on interactive controls, fully-round (9999px) reserved for the medallion, dot markers, and session Bubbles (فقاعات). No enclosing card rectangles.
 
 ## Components
 

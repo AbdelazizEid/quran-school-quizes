@@ -1,22 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, use } from "react";
+import { useEffect, useMemo, useRef, useState, use } from "react";
 import { io, type Socket } from "socket.io-client";
 import QRCode from "qrcode";
 import type { SessionState } from "@/lib/session-state";
 import CountdownRing from "@/components/CountdownRing";
-import Scoreboard from "@/components/Scoreboard";
-import Podium from "@/components/Podium";
+import { Bubbles, BubblePodium, type BubblePerson, type BubbleTone } from "@/components/Bubbles";
 import VoteBar from "@/components/VoteBar";
+import Confetti from "@/components/Confetti";
+import { sfx } from "@/lib/sfx";
+
+type AnswersUpdate = NonNullable<SessionState["answers"]> & { answered: string[] };
 
 export default function HostPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = use(params);
   const [state, setState] = useState<SessionState | null>(null);
   const [connected, setConnected] = useState(false);
-  const [answeredCount, setAnsweredCount] = useState(0);
+  const [answersUpdate, setAnswersUpdate] = useState<AnswersUpdate | null>(null);
+  const [online, setOnline] = useState<string[] | null>(null);
+  const [confettiFire, setConfettiFire] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const qrRef = useRef<HTMLCanvasElement | null>(null);
+  const prevRoster = useRef(0);
+  const seenRoster = useRef(false);
+  const phaseSeen = useRef<string | null>(null);
 
   useEffect(() => {
     const socket = io("/session", {
@@ -27,12 +35,33 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
     socketRef.current = socket;
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
-    socket.on("state", (s: SessionState) => setState(s));
-    socket.on("answers-update", (a: { total: number }) => setAnsweredCount(a.total));
+    socket.on("state", (s: SessionState) => {
+      setState(s);
+      if (s.online) setOnline(s.online);
+      // fresh state always carries the answers of the current question
+      setAnswersUpdate(null);
+      if (s.phase === "CLOSED" && phaseSeen.current !== "CLOSED") {
+        setConfettiFire((f) => f + 1);
+        sfx.fanfare();
+        phaseSeen.current = "CLOSED";
+      }
+    });
+    socket.on("answers-update", (a: AnswersUpdate) => setAnswersUpdate(a));
+    socket.on("presence", (ids: string[]) => setOnline(ids));
     return () => {
       socket.disconnect();
     };
   }, [sessionId]);
+
+  const roster = state?.roster ?? [];
+
+  // a new bubble flies in with a chime (silent before the first user gesture,
+  // and on a page refresh where the roster arrives pre-populated)
+  useEffect(() => {
+    if (seenRoster.current && roster.length > prevRoster.current) sfx.join();
+    seenRoster.current = true;
+    prevRoster.current = roster.length;
+  }, [roster.length]);
 
   const hostEmit = (event: "start" | "reveal" | "next" | "end") => {
     socketRef.current?.emit(event);
@@ -51,14 +80,48 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
     }).catch(() => undefined);
   }, [state?.joinCode, state?.phase]);
 
+  const leaderboard = state?.leaderboard ?? [];
+
+  const answeredSet = useMemo(
+    () => new Set(answersUpdate?.answered ?? state?.answers?.answered ?? []),
+    [answersUpdate, state]
+  );
+  const onlineSet = useMemo(() => (online === null ? null : new Set(online)), [online]);
+
+  const toneFor = (p: BubblePerson): BubbleTone => {
+    if (onlineSet && !onlineSet.has(p.id)) return "deflated";
+    switch (state?.phase) {
+      case "QUESTION":
+        return answeredSet.has(p.id) ? "lit" : "neutral";
+      case "ANSWER_REVIEW": {
+        const r = state.results?.[p.id];
+        if (!r) return "asleep";
+        return r.correct ? "correct" : "wrong";
+      }
+      default:
+        return "neutral";
+    }
+  };
+
+  // points ride the correct bubbles only during the reveal
+  const pointsByBubble = useMemo(() => {
+    if (state?.phase !== "ANSWER_REVIEW" || !state.results) return undefined;
+    const out: Record<string, string> = {};
+    for (const [id, r] of Object.entries(state.results)) {
+      if (r.correct) out[id] = `+${r.points}`;
+    }
+    return out;
+  }, [state]);
+
+  const podiumPhase = state?.phase === "LEADERBOARD" || state?.phase === "CLOSED";
+
   if (!state) {
     return <main className="min-h-screen p-10 text-[color:var(--muted-ink)]">جارٍ التحميل…</main>;
   }
 
-  const roster = state.roster ?? [];
-
   return (
     <main className="min-h-screen px-6 py-10 max-w-5xl mx-auto" dir="rtl">
+      <Confetti fire={confettiFire} />
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--gold-deep)]" dir="ltr">
@@ -80,21 +143,26 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
         </div>
       </header>
 
+      {/* the strip lives through the whole session; lobby = scattered, then it docks */}
+      <div className="mt-6">
+        <Bubbles
+          people={roster}
+          toneFor={toneFor}
+          variant={state.phase === "LOBBY" ? "float" : "strip"}
+          orderSeed={state.phase === "LOBBY" ? undefined : state.questionIndex}
+          dimmed={podiumPhase}
+          pointsByBubble={pointsByBubble}
+          ariaLabel={state.phase === "LOBBY" ? "المنضمون" : "طلاب الجلسة"}
+        />
+      </div>
+
       {state.phase === "LOBBY" && (
-        <section className="mt-12">
-          <h2 className="text-lg font-semibold">الردهة — {roster.length} طالبًا</h2>
-          <ul className="mt-6 flex flex-wrap gap-3" aria-label="المنضمون">
-            {roster.map((p) => (
-              <li key={p.id} className="px-5 py-3 border border-[color:var(--rule)] rounded-sm sb-enter">
-                {p.nickname}
-              </li>
-            ))}
-            {roster.length === 0 && (
-              <li className="text-[color:var(--muted-ink)]">شارك الرقم مع الطلاب للانضمام</li>
-            )}
-          </ul>
-          <div className="mt-10">
-            <HostBtn onClick={() => hostEmit("start")} disabled={!connected}>
+        <section>
+          <p className="text-center text-[color:var(--muted-ink)]">
+            {roster.length === 0 ? "شارك الرقم مع الطلاب للانضمام" : `الردهة — ${roster.length} طالبًا`}
+          </p>
+          <div className="mt-8 text-center">
+            <HostBtn onClick={() => hostEmit("start")} disabled={!connected || roster.length === 0}>
               ابدأ أول سؤال
             </HostBtn>
           </div>
@@ -102,7 +170,7 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
       )}
 
       {state.phase === "QUESTION" && state.question && (
-        <section className="mt-12 max-w-2xl mx-auto text-center">
+        <section className="mt-10 max-w-2xl mx-auto text-center">
           <div className="flex items-center justify-center gap-6">
             <CountdownRing
               startedAt={state.phaseStartedAt}
@@ -113,10 +181,6 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
             />
             <p className="text-[color:var(--muted-ink)]">
               سؤال {state.questionIndex + 1} / {state.questionCount}
-              <span className="block mt-1">
-                أجاب <span className="font-bold text-[color:var(--foreground)] tabular-nums">{answeredCount}</span> من{" "}
-                {roster.length}
-              </span>
             </p>
           </div>
           <h2 className="mt-8 text-2xl md:text-3xl font-bold leading-relaxed">{state.question.text}</h2>
@@ -129,7 +193,7 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
       )}
 
       {state.phase === "ANSWER_REVIEW" && state.question && (
-        <section className="mt-12 max-w-2xl mx-auto">
+        <section className="mt-10 max-w-2xl mx-auto">
           <div className="flex items-center justify-between">
             <p className="text-sm text-[color:var(--muted-ink)]">
               سؤال {state.questionIndex + 1} / {state.questionCount}
@@ -166,51 +230,56 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
         </section>
       )}
 
-      {state.phase === "LEADERBOARD" && !isLast && (
-        <section className="mt-12">
-          <div className="flex items-center justify-between max-w-xl mx-auto">
-            <h2 className="text-lg font-semibold">الترتيب بعد السؤال {state.questionIndex + 1}</h2>
-          </div>
-          <div className="mt-6" />
-          <div className="mt-10 text-center">
-            <HostBtn onClick={() => hostEmit("next")}>السؤال التالي</HostBtn>
-          </div>
-        </section>
-      )}
-
-      {/* mounted for the whole session: keeps row positions so each new
-          scoreboard animates the rewrite from the previous one */}
-      <div className={state.phase === "LEADERBOARD" && !isLast ? "mt-2" : "hidden"}>
-        <Scoreboard rows={state.phase === "LEADERBOARD" && !isLast ? state.leaderboard ?? [] : []} />
-      </div>
-
-      {state.phase === "LEADERBOARD" && isLast && (
-        <section className="mt-16">
-          <h2 className="text-center text-2xl font-bold">لوحة النتائج</h2>
-          <div className="mt-10">
-            <Podium rows={state.leaderboard ?? []} />
-          </div>
-          <div className="mt-12 text-center">
-            <HostBtn onClick={() => hostEmit("end")}>إنهاء وعرض المنصة</HostBtn>
-          </div>
-        </section>
-      )}
-
-      {state.phase === "CLOSED" && (
-        <section className="mt-16 text-center">
-          <h2 className="text-2xl font-bold">انتهت الجلسة</h2>
-          <div className="mt-10">
-            <Podium rows={state.leaderboard ?? []} />
-          </div>
-          <Link
-            href={`/results/${sessionId}`}
-            className="inline-block mt-10 px-8 py-4 text-lg font-semibold rounded-sm border border-[color:var(--gold)] text-[color:var(--foreground)] hover:bg-[color:var(--wash)]"
-          >
-            عرض النتائج الكاملة
-          </Link>
+      {podiumPhase && (
+        <section className="mt-10">
+          {state.phase === "LEADERBOARD" && !isLast && (
+            <h2 className="mb-8 text-center text-lg font-semibold">
+              الترتيب بعد السؤال {state.questionIndex + 1}
+            </h2>
+          )}
+          {state.phase === "CLOSED" && (
+            <h2 className="mb-8 text-center text-2xl font-bold">انتهت الجلسة</h2>
+          )}
+          <BubblePodium rows={leaderboard} />
+          <AlsoRan rows={leaderboard} />
+          {state.phase === "LEADERBOARD" && (
+            <div className="mt-10 text-center">
+              <HostBtn onClick={() => hostEmit(isLast ? "end" : "next")}>
+                {isLast ? "إنهاء وعرض المنصة" : "السؤال التالي"}
+              </HostBtn>
+            </div>
+          )}
+          {state.phase === "CLOSED" && (
+            <div className="mt-12 text-center">
+              <Link
+                href={`/results/${sessionId}`}
+                className="inline-block px-8 py-4 text-lg font-semibold rounded-sm border border-[color:var(--gold)] text-[color:var(--foreground)] hover:bg-[color:var(--wash)]"
+              >
+                عرض النتائج الكاملة
+              </Link>
+            </div>
+          )}
         </section>
       )}
     </main>
+  );
+}
+
+function AlsoRan({ rows }: { rows: BubblePerson[] }) {
+  const rest = rows.slice(3);
+  if (rest.length === 0) return null;
+  return (
+    <ol className="mx-auto mt-8 max-w-md border-t border-[color:var(--rule)]" aria-label="بقية الترتيب">
+      {rest.map((p, i) => (
+        <li key={p.id} className="flex items-center gap-3 border-b border-[color:var(--rule)] px-4 py-2.5">
+          <span className="w-7 text-sm tabular-nums text-[color:var(--muted-ink)]">{i + 4}</span>
+          <span className="truncate font-semibold">{p.nickname}</span>
+          <span className="ms-auto tabular-nums" dir="ltr">
+            {p.totalScore}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

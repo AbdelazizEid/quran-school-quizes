@@ -12,8 +12,9 @@ export type SessionState = {
     timeLimitSec: number;
     options: { id: string; text: string; isCorrect?: boolean }[];
   } | null;
-  answers?: { counts: Record<string, number>; total: number };
+  answers?: { counts: Record<string, number>; total: number; answered?: string[] };
   roster?: { id: string; nickname: string; totalScore: number; streak?: number }[];
   leaderboard?: { id: string; nickname: string; totalScore: number; streak?: number }[];
   results?: Record<string, { correct: boolean; points: number; bonus: number; streak: number }>;
+  online?: string[];
 };
