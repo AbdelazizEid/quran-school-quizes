@@ -43,6 +43,39 @@ type Draft = {
   sources: SourceMetadata[];
 };
 
+type GenerationPayload = { draft: Draft; response: { type: string; message?: string } };
+type GenerationStreamEvent =
+  | { type: "delta"; text: string }
+  | { type: "error"; error: string }
+  | { type: "done"; draft: Draft; response: { type: string; message?: string } };
+
+async function readGenerationStream(
+  body: ReadableStream<Uint8Array>,
+  onDelta: (text: string) => void,
+): Promise<GenerationPayload> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let done: GenerationPayload | null = null;
+  for (;;) {
+    const { done: finished, value } = await reader.read();
+    if (finished) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary: number;
+    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+      const chunk = buffer.slice(0, boundary).trim();
+      buffer = buffer.slice(boundary + 2);
+      if (!chunk.startsWith("data:")) continue;
+      const event = JSON.parse(chunk.slice(5)) as GenerationStreamEvent;
+      if (event.type === "delta") onDelta(event.text);
+      else if (event.type === "error") throw new Error(event.error);
+      else if (event.type === "done") done = { draft: event.draft, response: event.response };
+    }
+  }
+  if (!done) throw new Error("provider-failed");
+  return done;
+}
+
 const policyChoices: { value: SourcePolicy; label: string; hint: string }[] = [
   { value: "GENERAL_KNOWLEDGE_ONLY", label: "المعرفة العامة فقط", hint: "لا تُستخدم ملفات أو مصادر مرفوعة." },
   { value: "SOURCES_ONLY", label: "المصادر المرفوعة فقط", hint: "تُبنى الأسئلة من المصادر المرفوعة وحدها." },
@@ -102,6 +135,7 @@ export default function AiQuizDraftPage() {
   const [tab, setTab] = useState<"conversation" | "draft">("conversation");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<"targeted" | "new-set" | "initial" | null>(null);
+  const [streamText, setStreamText] = useState<string | null>(null);
   const [revisionAction, setRevisionAction] = useState<"apply" | "discard" | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -299,21 +333,36 @@ export default function AiQuizDraftPage() {
     setNotice(null);
     if (!(await patchDraft(false))) return;
     setGenerating(mode);
+    setStreamText("");
     const response = await fetch(`/api/ai-quiz-drafts/${id}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ instruction, questionCount, mode }),
+      body: JSON.stringify({ instruction, questionCount, mode, stream: true }),
     });
-    const data = await response.json();
+    const contentType = response.headers.get("content-type") ?? "";
+    let data: GenerationPayload | { error: string };
+    if (response.ok && contentType.includes("text/event-stream") && response.body) {
+      try {
+        data = await readGenerationStream(response.body, (text) => setStreamText((current) => (current ?? "") + text));
+      } catch (reason) {
+        setGenerating(null);
+        setStreamText(null);
+        setError(errorMessage(reason instanceof Error && reason.message ? reason.message : "provider-failed"));
+        return;
+      }
+    } else {
+      data = await response.json();
+    }
     setGenerating(null);
-    if (!response.ok) {
-      setError(errorMessage(data.error));
+    setStreamText(null);
+    if (!response.ok || "error" in data) {
+      setError(errorMessage("error" in data ? data.error : "provider-failed"));
       return;
     }
     setDraft({ ...data.draft, sources: data.draft.sources ?? [], pendingRevision: data.draft.pendingRevision ?? null });
     setSources(data.draft.sources ?? []);
-    if (data.response.type === "clarification") setNotice(data.response.message);
-    else if (data.response.type === "revision") setNotice(data.response.message);
+    if (data.response.type === "clarification") setNotice(data.response.message ?? null);
+    else if (data.response.type === "revision") setNotice(data.response.message ?? null);
     else if (mode === "new-set") setNotice("أُعدّت مجموعة جديدة للمعاينة. طبّقها إذا وافقت عليها.");
     else setNotice("أُعدّت المسودة. راجع الأسئلة ثم احفظها كاختبار.");
     setTab("draft");
@@ -417,6 +466,14 @@ export default function AiQuizDraftPage() {
                 <p className="mt-1 leading-7">{message.content}</p>
               </div>
             ))}
+            {streamText !== null && (
+              <div>
+                <p className="text-xs text-[color:var(--gold-deep)]">المساعد</p>
+                <p className="mt-1 leading-7 whitespace-pre-wrap break-words text-[color:var(--muted-ink)]">
+                  {streamText || "…"}
+                </p>
+              </div>
+            )}
           </div>
 
           <label htmlFor="instruction" className="mt-6 block font-semibold">تعليماتك</label>

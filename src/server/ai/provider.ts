@@ -8,7 +8,7 @@ import type { DraftQuestion, QuestionKind, SourcePolicy } from "@/lib/ai-quiz-dr
 
 export const DEFAULT_GLM_MODEL = "glm-5.3-flash";
 export const DEFAULT_GLM_BASE_URL = "https://api.z.ai/api/paas/v4";
-const DEFAULT_TIMEOUT_MS = 90_000;
+const DEFAULT_TIMEOUT_MS = 150_000;
 
 export type AiQuizProviderMode = "initial" | "targeted" | "new-set";
 
@@ -48,6 +48,11 @@ export interface AiQuizProvider {
   /** True when a generate call consumes the paid shared allowance. */
   readonly metered: boolean;
   generate(request: AiQuizProviderRequest): Promise<AiQuizProviderResponse>;
+  /** Streams raw model output through onDelta; same validation as generate. */
+  generateStreaming?(
+    request: AiQuizProviderRequest,
+    onDelta: (text: string) => void,
+  ): Promise<AiQuizProviderResponse>;
 }
 
 export type AiQuizProviderErrorCode =
@@ -454,7 +459,7 @@ function requestInput(request: AiQuizProviderRequest): string {
   return input.join("\n\n");
 }
 
-function requestBody(model: string, request: AiQuizProviderRequest): Record<string, unknown> {
+function requestBody(model: string, request: AiQuizProviderRequest, stream = false): Record<string, unknown> {
   return {
     model,
     messages: [
@@ -464,7 +469,44 @@ function requestBody(model: string, request: AiQuizProviderRequest): Record<stri
     // Z.AI documents json_object only; the schema contract travels in the
     // system message (see systemInstructionsFor).
     response_format: { type: "json_object" },
+    ...(stream ? { stream: true } : {}),
   };
+}
+
+/** Extracts content deltas from an OpenAI-compatible SSE body. */
+async function* sseContentDeltas(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newlineIndex: number;
+      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        const delta = sseLineDelta(line);
+        if (delta) yield delta;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function sseLineDelta(line: string): string | null {
+  if (!line.startsWith("data:")) return null;
+  const payload = line.slice(5).trim();
+  if (!payload || payload === "[DONE]") return null;
+  try {
+    const parsed = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: unknown } }> };
+    const content = parsed.choices?.[0]?.delta?.content;
+    return typeof content === "string" && content.length > 0 ? content : null;
+  } catch {
+    return null;
+  }
 }
 
 export class GlmAiQuizProvider implements AiQuizProvider {
@@ -541,6 +583,67 @@ export class GlmAiQuizProvider implements AiQuizProvider {
           }, this.timeoutMs);
         }),
       ]);
+    } catch (error) {
+      if (error instanceof AiQuizProviderError) throw error;
+      if (timedOut || isAbortError(error)) throw new AiQuizProviderError("timeout");
+      throw new AiQuizProviderError("unavailable");
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  // Streaming keeps data flowing so proxies don't idle-kill long generations;
+  // the timeout applies per idle gap (no chunk for timeoutMs), not to the
+  // total duration.
+  async generateStreaming(
+    request: AiQuizProviderRequest,
+    onDelta: (text: string) => void,
+  ): Promise<AiQuizProviderResponse> {
+    if (!this.apiKey) throw new AiQuizProviderError("not-configured");
+    if (!this.fetcher) throw new AiQuizProviderError("unavailable");
+
+    const controller = new AbortController();
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const armIdleTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        timer = undefined;
+      }, this.timeoutMs);
+    };
+    armIdleTimer();
+    try {
+      const response = await this.fetcher!(this.endpoint, {
+        method: "POST",
+        headers: {
+          Accept: "text/event-stream",
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody(this.model, request, true)),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw providerErrorForStatus(response.status);
+      if (!response.body) throw new AiQuizProviderError("malformed-response");
+
+      let text = "";
+      for await (const delta of sseContentDeltas(response.body)) {
+        armIdleTimer();
+        text += delta;
+        onDelta(delta);
+      }
+      if (timedOut) throw new AiQuizProviderError("timeout");
+      if (!text) throw new AiQuizProviderError("malformed-response");
+      try {
+        return parseProviderResponse(parseJsonText(text), request);
+      } catch (error) {
+        if (error instanceof AiQuizProviderError && error.code === "malformed-response") {
+          console.warn("GLM quiz draft rejected (malformed-response):", text.slice(0, 1500));
+        }
+        throw error;
+      }
     } catch (error) {
       if (error instanceof AiQuizProviderError) throw error;
       if (timedOut || isAbortError(error)) throw new AiQuizProviderError("timeout");

@@ -15,6 +15,7 @@ import { sourceMetadata } from "@/lib/draft-sources";
 import { prisma } from "@/lib/prisma";
 import { getTeacher } from "@/lib/teacher";
 import { AiQuizProviderError, getAiQuizProvider } from "@/server/ai/provider";
+import type { AiQuizProvider, AiQuizProviderRequest } from "@/server/ai/provider";
 import {
   GENERATION_WINDOW_MS,
   acquireGenerationSlot,
@@ -29,6 +30,142 @@ import {
 type Params = { params: Promise<{ id: string }> };
 
 const sourcesInclude = { sources: { orderBy: { createdAt: "asc" } } } as const;
+
+type GenerationMode = "initial" | "targeted" | "new-set";
+
+async function ensureWithinUsage(
+  teacherId: string,
+): Promise<{ error: string; limit?: number; retryAfterSec?: number } | null> {
+  const windowStart = new Date(Date.now() - GENERATION_WINDOW_MS);
+  const usage = await prisma.aIUsageEvent.findMany({
+    where: { teacherId, createdAt: { gte: windowStart } },
+    select: { createdAt: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (usage.length >= generationsPerHour()) {
+    return { error: "rate-limited", limit: generationsPerHour(), retryAfterSec: retryAfterSeconds(usage[0].createdAt) };
+  }
+  await prisma.aIUsageEvent.deleteMany({ where: { createdAt: { lt: windowStart } } });
+  return null;
+}
+
+type ConversationWithSources = Prisma.AIQuizDraftConversationGetPayload<{ include: typeof sourcesInclude }>;
+
+async function persistGeneration(
+  id: string,
+  current: ConversationWithSources,
+  args: { instruction: string; mode: GenerationMode; response: Awaited<ReturnType<AiQuizProvider["generate"]>> },
+) {
+  const { instruction, mode, response } = args;
+  const now = new Date().toISOString();
+  const messages = draftMessages(current.messages);
+  const nextMessages = [
+    ...messages,
+    { role: "teacher" as const, content: instruction, createdAt: now },
+    {
+      role: "assistant" as const,
+      content:
+        response.type === "draft"
+          ? mode === "new-set"
+            ? "اقترحت مجموعة أسئلة جديدة للمراجعة قبل تطبيقها."
+            : "أعددت مسودة أسئلة عربية للمراجعة."
+          : response.message,
+      createdAt: now,
+    },
+  ];
+
+  if (response.type !== "draft" && response.type !== "revision") {
+    const updated = await prisma.aIQuizDraftConversation.update({
+      where: { id },
+      data: { instruction, messages: nextMessages, pendingRevision: Prisma.JsonNull },
+      include: sourcesInclude,
+    });
+    return { draft: { ...updated, sources: sourceMetadata(updated.sources) }, response };
+  }
+
+  if (mode === "targeted") {
+    if (response.type !== "revision") {
+      throw new AiQuizProviderError("malformed-response");
+    }
+    const revisionWithoutProposal: DraftRevision = {
+      mode: "targeted",
+      instruction,
+      summary: response.message,
+      baseQuestions: draftQuestions(current.questions),
+      proposedQuestions: draftQuestions(current.questions),
+      changes: response.changes,
+      createdAt: now,
+    };
+    const proposedQuestions = applyDraftRevision(draftQuestions(current.questions), revisionWithoutProposal).questions;
+    const validation = validateQuizDraft({
+      title: current.title,
+      description: current.description,
+      questions: proposedQuestions,
+    });
+    if (!validation.valid) throw new AiQuizProviderError("malformed-response");
+
+    const revision: DraftRevision = { ...revisionWithoutProposal, proposedQuestions };
+    const updated = await prisma.aIQuizDraftConversation.update({
+      where: { id },
+      data: {
+        instruction,
+        messages: nextMessages,
+        pendingRevision: revision as unknown as Prisma.InputJsonValue,
+      },
+      include: sourcesInclude,
+    });
+    return { draft: { ...updated, sources: sourceMetadata(updated.sources) }, response };
+  }
+
+  if (response.type !== "draft") {
+    throw new AiQuizProviderError("malformed-response");
+  }
+
+  const validation = validateQuizDraft({
+    title: response.title,
+    description: response.description,
+    questions: response.questions,
+  });
+  if (!validation.valid) throw new AiQuizProviderError("malformed-response");
+
+  if (mode === "new-set") {
+    const revision: DraftRevision = {
+      mode: "new-set",
+      instruction,
+      summary: "اقترحت مجموعة أسئلة جديدة للمراجعة.",
+      baseQuestions: draftQuestions(current.questions),
+      proposedQuestions: response.questions,
+      changes: response.questions.map((question, questionIndex) => ({ questionIndex, question })),
+      proposedTitle: response.title,
+      proposedDescription: response.description,
+      createdAt: now,
+    };
+    const updated = await prisma.aIQuizDraftConversation.update({
+      where: { id },
+      data: {
+        instruction,
+        messages: nextMessages,
+        pendingRevision: revision as unknown as Prisma.InputJsonValue,
+      },
+      include: sourcesInclude,
+    });
+    return { draft: { ...updated, sources: sourceMetadata(updated.sources) }, response };
+  }
+
+  const updated = await prisma.aIQuizDraftConversation.update({
+    where: { id },
+    data: {
+      instruction,
+      title: response.title,
+      description: response.description,
+      questions: response.questions,
+      messages: nextMessages,
+      pendingRevision: Prisma.JsonNull,
+    },
+    include: sourcesInclude,
+  });
+  return { draft: { ...updated, sources: sourceMetadata(updated.sources) }, response };
+}
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -46,7 +183,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "sources-required" }, { status: 400 });
   }
 
-  let body: { instruction?: unknown; questionCount?: unknown; difficulty?: unknown; mode?: unknown } = {};
+  let body: { instruction?: unknown; questionCount?: unknown; difficulty?: unknown; mode?: unknown; stream?: unknown } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -96,45 +233,90 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "generation-in-progress" }, { status: 429 });
   }
 
-  try {
-    const windowStart = new Date(Date.now() - GENERATION_WINDOW_MS);
-    const usage = await prisma.aIUsageEvent.findMany({
-      where: { teacherId: teacher.id, createdAt: { gte: windowStart } },
-      select: { createdAt: true },
-      orderBy: { createdAt: "asc" },
-    });
-    if (usage.length >= generationsPerHour()) {
-      return NextResponse.json(
-        {
-          error: "rate-limited",
-          limit: generationsPerHour(),
-          retryAfterSec: retryAfterSeconds(usage[0].createdAt),
-        },
-        { status: 429 },
-      );
-    }
-    await prisma.aIUsageEvent.deleteMany({ where: { createdAt: { lt: windowStart } } });
+  const provider = getAiQuizProvider();
+  const providerRequest: AiQuizProviderRequest = {
+    instruction,
+    sourcePolicy,
+    sources: policySources,
+    questionCount,
+    difficulty,
+    allowedKinds: mode === "targeted" ? ["MCQ", "TRUE_FALSE", "INPUT"] : ["MCQ", "TRUE_FALSE"],
+    mode,
+    currentDraft:
+      mode === "targeted"
+        ? { title: current.title, description: current.description, questions: currentQuestions }
+        : undefined,
+  };
+  const metered = provider.metered;
 
-    const provider = getAiQuizProvider();
-    if (provider.metered) {
+  if (body.stream === true) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (event: unknown) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        };
+        try {
+          const limitError = await ensureWithinUsage(teacher.id);
+          if (limitError) {
+            send({ type: "error", ...limitError });
+            return;
+          }
+          if (metered) {
+            await prisma.aIUsageEvent.create({ data: { teacherId: teacher.id } });
+          }
+          let response;
+          try {
+            response = provider.generateStreaming
+              ? await provider.generateStreaming(providerRequest, (text) => send({ type: "delta", text }))
+              : await provider.generate(providerRequest);
+          } catch (error) {
+            if (error instanceof AiQuizProviderError) {
+              send({ type: "error", error: `provider-${error.code}`, retryable: true });
+            } else {
+              send({ type: "error", error: "provider-failed", retryable: true });
+            }
+            return;
+          }
+          let payload;
+          try {
+            payload = await persistGeneration(id, current, { instruction, mode, response });
+          } catch (error) {
+            const code = error instanceof AiQuizProviderError ? error.code : "failed";
+            send({ type: "error", error: `provider-${code}`, retryable: true });
+            return;
+          }
+          send({ type: "done", ...payload });
+        } finally {
+          releaseGenerationSlot(teacher.id);
+          controller.close();
+        }
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        // nginx buffers proxied responses by default; this opts this response
+        // out so SSE deltas reach the browser as they are produced.
+        "X-Accel-Buffering": "no",
+      },
+    });
+  }
+
+  try {
+    const limitError = await ensureWithinUsage(teacher.id);
+    if (limitError) {
+      return NextResponse.json(limitError, { status: 429 });
+    }
+    if (metered) {
       await prisma.aIUsageEvent.create({ data: { teacherId: teacher.id } });
     }
 
     let response;
     try {
-      response = await provider.generate({
-        instruction,
-        sourcePolicy,
-        sources: policySources,
-        questionCount,
-        difficulty,
-        allowedKinds: mode === "targeted" ? ["MCQ", "TRUE_FALSE", "INPUT"] : ["MCQ", "TRUE_FALSE"],
-        mode,
-        currentDraft:
-          mode === "targeted"
-            ? { title: current.title, description: current.description, questions: currentQuestions }
-            : undefined,
-      });
+      response = await provider.generate(providerRequest);
     } catch (error) {
       if (error instanceof AiQuizProviderError) {
         return NextResponse.json({ error: `provider-${error.code}`, retryable: true }, { status: error.status });
@@ -142,114 +324,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "provider-failed", retryable: true }, { status: 502 });
     }
 
-    const now = new Date().toISOString();
-    const messages = draftMessages(current.messages);
-    const nextMessages = [
-      ...messages,
-      { role: "teacher" as const, content: instruction, createdAt: now },
-      {
-        role: "assistant" as const,
-        content:
-          response.type === "draft"
-            ? mode === "new-set"
-              ? "اقترحت مجموعة أسئلة جديدة للمراجعة قبل تطبيقها."
-              : "أعددت مسودة أسئلة عربية للمراجعة."
-            : response.message,
-        createdAt: now,
-      },
-    ];
-
-    if (response.type !== "draft" && response.type !== "revision") {
-      const updated = await prisma.aIQuizDraftConversation.update({
-        where: { id },
-        data: { instruction, messages: nextMessages, pendingRevision: Prisma.JsonNull },
-        include: sourcesInclude,
-      });
-      return NextResponse.json({ draft: { ...updated, sources: sourceMetadata(updated.sources) }, response });
-    }
-
-    if (mode === "targeted") {
-      if (response.type !== "revision") {
-        return NextResponse.json({ error: "provider-malformed-response", retryable: true }, { status: 502 });
-      }
-      const revisionWithoutProposal: DraftRevision = {
-        mode: "targeted",
-        instruction,
-        summary: response.message,
-        baseQuestions: currentQuestions,
-        proposedQuestions: currentQuestions,
-        changes: response.changes,
-        createdAt: now,
-      };
-      const proposedQuestions = applyDraftRevision(currentQuestions, revisionWithoutProposal).questions;
-      const validation = validateQuizDraft({
-        title: current.title,
-        description: current.description,
-        questions: proposedQuestions,
-      });
-      if (!validation.valid) return NextResponse.json({ error: "provider-malformed-response", retryable: true }, { status: 502 });
-
-      const revision: DraftRevision = { ...revisionWithoutProposal, proposedQuestions };
-      const updated = await prisma.aIQuizDraftConversation.update({
-        where: { id },
-        data: {
-          instruction,
-          messages: nextMessages,
-          pendingRevision: revision as unknown as Prisma.InputJsonValue,
-        },
-        include: sourcesInclude,
-      });
-      return NextResponse.json({ draft: { ...updated, sources: sourceMetadata(updated.sources) }, response });
-    }
-
-    if (response.type !== "draft") {
-      return NextResponse.json({ error: "provider-malformed-response", retryable: true }, { status: 502 });
-    }
-
-    const validation = validateQuizDraft({
-      title: response.title,
-      description: response.description,
-      questions: response.questions,
-    });
-    if (!validation.valid) return NextResponse.json({ error: "provider-malformed-response", retryable: true }, { status: 502 });
-
-    if (mode === "new-set") {
-      const revision: DraftRevision = {
-        mode: "new-set",
-        instruction,
-        summary: "اقترحت مجموعة أسئلة جديدة للمراجعة.",
-        baseQuestions: currentQuestions,
-        proposedQuestions: response.questions,
-        changes: response.questions.map((question, questionIndex) => ({ questionIndex, question })),
-        proposedTitle: response.title,
-        proposedDescription: response.description,
-        createdAt: now,
-      };
-      const updated = await prisma.aIQuizDraftConversation.update({
-        where: { id },
-        data: {
-          instruction,
-          messages: nextMessages,
-          pendingRevision: revision as unknown as Prisma.InputJsonValue,
-        },
-        include: sourcesInclude,
-      });
-      return NextResponse.json({ draft: { ...updated, sources: sourceMetadata(updated.sources) }, response });
-    }
-
-    const updated = await prisma.aIQuizDraftConversation.update({
-      where: { id },
-      data: {
-        instruction,
-        title: response.title,
-        description: response.description,
-        questions: response.questions,
-        messages: nextMessages,
-        pendingRevision: Prisma.JsonNull,
-      },
-      include: sourcesInclude,
-    });
-    return NextResponse.json({ draft: { ...updated, sources: sourceMetadata(updated.sources) }, response });
+    const payload = await persistGeneration(id, current, { instruction, mode, response });
+    return NextResponse.json(payload);
   } finally {
     releaseGenerationSlot(teacher.id);
   }

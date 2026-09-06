@@ -50,6 +50,57 @@ function chatResponse(body: unknown): Response {
   return jsonResponse({ choices: [{ message: { content: JSON.stringify(body) } }] });
 }
 
+function sseResponse(body: unknown, chunkSize = 12): Response {
+  const text = JSON.stringify(body);
+  const frames: string[] = [];
+  for (let index = 0; index < text.length; index += chunkSize) {
+    const piece = text.slice(index, index + chunkSize);
+    frames.push(`data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n\n`);
+  }
+  frames.push("data: [DONE]\n\n");
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const frame of frames) controller.enqueue(new TextEncoder().encode(frame));
+      controller.close();
+    },
+  });
+  return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+}
+
+test("generateStreaming forwards deltas and validates the assembled JSON", async () => {
+  let sentBody: { stream?: boolean } | undefined;
+  const provider = new GlmAiQuizProvider({
+    apiKey: "test-key",
+    fetch: async (_input, init) => {
+      sentBody = JSON.parse(String(init?.body));
+      return sseResponse(responseBody());
+    },
+  });
+  let streamed = "";
+  const result = await provider.generateStreaming(request, (text) => {
+    streamed += text;
+  });
+
+  assert.equal(sentBody?.stream, true);
+  assert.equal(streamed, JSON.stringify(responseBody()));
+  assert.equal(result.type, "draft");
+  assert.deepEqual(
+    (result as { questions?: unknown[] }).questions?.length ?? 0,
+    1,
+  );
+});
+
+test("generateStreaming surfaces provider errors from non-ok responses", async () => {
+  const provider = new GlmAiQuizProvider({
+    apiKey: "test-key",
+    fetch: async () => new Response("rate limited", { status: 429 }),
+  });
+  await assert.rejects(provider.generateStreaming(request, () => {}), (error: AiQuizProviderError) => {
+    assert.equal(error.code, "rate-limit");
+    return true;
+  });
+});
+
 test("GLM uses the configured Chat Completions endpoint and returns a structured Arabic draft", async () => {
   let calledUrl = "";
   let calledInit: RequestInit | undefined;
