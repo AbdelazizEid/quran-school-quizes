@@ -22,7 +22,9 @@ export default defineConfig({
     // strict on purpose: a reused foreign server (real Clerk key) 401s every
     // API call silently; failing fast on a held port is easier to diagnose
     reuseExistingServer: false,
-    env: { CLERK_SECRET_KEY: "placeholder" },
+    // GLM_API_KEY is blanked so the deterministic fake provider serves e2e:
+    // no paid calls, no network latency, deterministic Arabic fixtures.
+    env: { CLERK_SECRET_KEY: "placeholder", GLM_API_KEY: "" },
   },
   projects: [
     { name: "desktop", use: { viewport: { width: 1440, height: 900 } } },

@@ -10,7 +10,7 @@ export const DEFAULT_GLM_MODEL = "glm-5.3-flash";
 export const DEFAULT_GLM_BASE_URL = "https://api.z.ai/api/paas/v4";
 const DEFAULT_TIMEOUT_MS = 150_000;
 
-export type AiQuizProviderMode = "initial" | "targeted" | "new-set";
+export type AiQuizProviderMode = "initial" | "targeted";
 
 /** Extracted text only — original file bytes never reach the provider. */
 export type AiQuizProviderSource = {
@@ -42,6 +42,7 @@ export type AiQuizProviderResponse =
       message: string;
       changes: { questionIndex: number; question: DraftQuestion }[];
     }
+  | { type: "confirm_save"; message: string }
   | { type: "unsupported"; message: string };
 
 export interface AiQuizProvider {
@@ -137,7 +138,7 @@ const questionSchema = {
 const responseSchema = {  type: "object",
   additionalProperties: false,
   properties: {
-    type: { type: "string", enum: ["clarification", "draft", "revision", "unsupported"] },
+    type: { type: "string", enum: ["clarification", "draft", "revision", "confirm_save", "unsupported"] },
     message: { type: ["string", "null"] },
     title: { type: ["string", "null"] },
     description: { type: ["string", "null"] },
@@ -188,6 +189,7 @@ function systemInstructionsFor(policy: SourcePolicy): string {
     "كل النصوص الظاهرة للمدرس يجب أن تكون باللغة العربية فقط.",
     ...policyInstructionLines(policy),
     "استخدم clarification فقط إذا كانت التعليمات غير كافية لتحديد النطاق، واستخدم unsupported إذا كان الطلب غير مناسب لإنشاء أسئلة.",
+    "استخدم confirm_save فقط إذا طلب المدرس صراحةً حفظ المسودة كاختبار وكانت المسودة الحالية تحتوي أسئلة مكتملة؛ وإذا كان الطلب غامضًا أو لا توجد أسئلة بعد فاستخدم clarification ولا تحفظ أبدًا بدون تأكيد صريح.",
     "في المراجعة الموجهة استخدم revision، وحدد أرقام الأسئلة المتأثرة فقط في changes، وأعد السؤال الكامل لكل تغيير.",
     "في المراجعة الموجهة لا تغيّر الأسئلة غير المذكورة ولا العنوان أو الوصف.",
     'قواعد لكل نوع: في MCQ من خيارين إلى أربعة خيارات بإجابة صحيحة واحدة بالضبط؛ في TRUE_FALSE يجب أن تكون options بالضبط: [{"text":"صح","isCorrect":true},{"text":"خطأ","isCorrect":false}] أو بعكس isCorrect مع بقاء إجابة صحيحة واحدة؛ في INPUT يجب أن تكون options مصفوفة فارغة []؛ وtimeLimitSec عدد صحيح بين 5 و120.',
@@ -355,7 +357,7 @@ function parseRevision(value: RecordValue, request: AiQuizProviderRequest): AiQu
 function parseProviderResponse(value: unknown, request: AiQuizProviderRequest): AiQuizProviderResponse {
   if (!isRecord(value) || typeof value.type !== "string") throw new AiQuizProviderError("malformed-response");
 
-  if (value.type === "clarification" || value.type === "unsupported") {
+  if (value.type === "clarification" || value.type === "unsupported" || value.type === "confirm_save") {
     const message = requiredArabicText(value.message);
     if (!message) throw new AiQuizProviderError("malformed-response");
     return { type: value.type, message };
@@ -431,7 +433,7 @@ function requestInput(request: AiQuizProviderRequest): string {
   const input = [
     "أنشئ مسودة أسئلة عربية وفق هذه التعليمات:",
     request.instruction,
-    `نوع الطلب: ${mode === "targeted" ? "مراجعة موجهة" : mode === "new-set" ? "مجموعة جديدة مقصودة" : "مسودة أولية"}`,
+    `نوع الطلب: ${mode === "targeted" ? "مراجعة موجهة" : "مسودة أولية"}`,
     `عدد الأسئلة المطلوب: ${request.questionCount}`,
     `الصعوبة: ${request.difficulty}`,
     `الأنواع المسموحة: ${request.allowedKinds.join(", ")}`,
@@ -695,6 +697,13 @@ export class DeterministicFakeAiQuizProvider implements AiQuizProvider {
         type: "clarification",
         message: "ما موضوع الأسئلة أو السورة التي تريد أن تتناولها؟",
       };
+    }
+
+    if (/احفظ|حفظ الاختبار|سجّل/.test(request.instruction)) {
+      const hasDraft = (request.currentDraft?.questions.length ?? 0) > 0;
+      return hasDraft
+        ? { type: "confirm_save", message: "ممتاز، سأحفظ هذه الأسئلة كاختبار الآن." }
+        : { type: "clarification", message: "لا توجد أسئلة بعد. اطلب إنشاء الأسئلة أولًا ثم احفظ الاختبار." };
     }
 
     if (request.mode === "targeted") {

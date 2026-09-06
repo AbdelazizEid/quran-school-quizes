@@ -63,25 +63,6 @@ export type DraftData = {
   questions: unknown;
 };
 
-export type DraftRevisionMode = "targeted" | "new-set";
-
-export type DraftRevisionChange = {
-  questionIndex: number;
-  question: DraftQuestion;
-};
-
-export type DraftRevision = {
-  mode: DraftRevisionMode;
-  instruction: string;
-  summary: string;
-  baseQuestions: DraftQuestion[];
-  proposedQuestions: DraftQuestion[];
-  changes: DraftRevisionChange[];
-  proposedTitle?: string;
-  proposedDescription?: string;
-  createdAt: string;
-};
-
 type RecordValue = Record<string, unknown>;
 
 function isRecord(value: unknown): value is RecordValue {
@@ -227,59 +208,6 @@ function timeLimitOf(question: ManualQuestionInput): number {
 
 export function draftMessages(value: unknown): DraftMessage[] {
   return Array.isArray(value) ? (value as DraftMessage[]) : [];
-}
-
-export function draftRevision(value: unknown): DraftRevision | null {
-  if (!isRecord(value)) return null;
-  if (
-    (value.mode !== "targeted" && value.mode !== "new-set") ||
-    typeof value.instruction !== "string" ||
-    typeof value.summary !== "string" ||
-    !Array.isArray(value.baseQuestions) ||
-    !Array.isArray(value.proposedQuestions) ||
-    !Array.isArray(value.changes) ||
-    typeof value.createdAt !== "string"
-  ) {
-    return null;
-  }
-  return value as unknown as DraftRevision;
-}
-
-function sameDraftValue(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-export function applyDraftRevision(
-  currentQuestions: DraftQuestion[],
-  revision: DraftRevision,
-): {
-  questions: DraftQuestion[];
-  appliedQuestionIndexes: number[];
-  conflictedQuestionIndexes: number[];
-} {
-  if (revision.mode === "new-set") {
-    return {
-      questions: revision.proposedQuestions,
-      appliedQuestionIndexes: revision.proposedQuestions.map((_, index) => index),
-      conflictedQuestionIndexes: [],
-    };
-  }
-
-  const questions = [...currentQuestions];
-  const appliedQuestionIndexes: number[] = [];
-  const conflictedQuestionIndexes: number[] = [];
-
-  for (const change of revision.changes) {
-    const baseQuestion = revision.baseQuestions[change.questionIndex];
-    if (baseQuestion && sameDraftValue(questions[change.questionIndex], baseQuestion)) {
-      questions[change.questionIndex] = change.question;
-      appliedQuestionIndexes.push(change.questionIndex);
-    } else {
-      conflictedQuestionIndexes.push(change.questionIndex);
-    }
-  }
-
-  return { questions, appliedQuestionIndexes, conflictedQuestionIndexes };
 }
 
 export function generalKnowledgeEvidence(policy: SourcePolicy = DEFAULT_SOURCE_POLICY): SourceEvidence {

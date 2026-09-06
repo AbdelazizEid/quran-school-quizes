@@ -143,7 +143,7 @@ test("GLM uses the configured Chat Completions endpoint and returns a structured
   });
 });
 
-test("GLM reads the chat completion content and structured clarification responses", async () => {
+test("GLM parses structured clarification responses", async () => {
   const provider = new GlmAiQuizProvider({
     apiKey: "test-key",
     fetch: async () => chatResponse({ type: "clarification", message: "ما السورة المطلوبة؟" }),
@@ -153,6 +153,31 @@ test("GLM reads the chat completion content and structured clarification respons
     type: "clarification",
     message: "ما السورة المطلوبة؟",
   });
+});
+
+test("GLM parses a save confirmation and the prompt forbids unconfirmed saves", async () => {
+  let systemPrompt = "";
+  const provider = new GlmAiQuizProvider({
+    apiKey: "test-key",
+    fetch: async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { messages: { role: string; content: string }[] };
+      systemPrompt = body.messages[0].content;
+      return chatResponse({ type: "confirm_save", message: "سأحفظ الأسئلة كاختبار الآن." });
+    },
+  });
+
+  assert.deepEqual(await provider.generate(request), {
+    type: "confirm_save",
+    message: "سأحفظ الأسئلة كاختبار الآن.",
+  });
+  assert.match(systemPrompt, /confirm_save/);
+  assert.match(systemPrompt, /بدون تأكيد صريح/);
+
+  const emptyMessage = new GlmAiQuizProvider({
+    apiKey: "test-key",
+    fetch: async () => chatResponse({ type: "confirm_save", message: "" }),
+  });
+  await assert.rejects(emptyMessage.generate(request), { code: "malformed-response" });
 });
 
 test("GLM parses a targeted revision against the current draft", async () => {

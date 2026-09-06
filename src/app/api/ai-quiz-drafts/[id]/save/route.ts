@@ -18,9 +18,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   const draft = await prisma.aIQuizDraftConversation.findFirst({ where: { id, teacherId: teacher.id } });
   if (!draft) return NextResponse.json({ error: "not-found" }, { status: 404 });
-  if (draft.pendingRevision !== null) {
-    return NextResponse.json({ error: "revision-pending" }, { status: 400 });
-  }
 
   const validation = validateQuizDraft({
     title: draft.title,

@@ -158,7 +158,6 @@ model AIQuizDraftConversation {
   description  String   @default("")
   questions    Json
   messages     Json
-  pendingRevision Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

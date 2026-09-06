@@ -93,7 +93,7 @@ test("draft save rejects malformed Question data at the server boundary", async 
   }
 });
 
-test("targeted revisions are previewed, can be discarded or applied, and preserve direct edits", async ({ request }) => {
+test("chat revisions apply directly to the draft and saving flows through confirm_save", async ({ request }) => {
   const start = await request.post("/api/ai-quiz-drafts");
   const id = (await start.json()).draft.id as string;
   const generated = await request.post(`/api/ai-quiz-drafts/${id}/generate`, {
@@ -107,129 +107,91 @@ test("targeted revisions are previewed, can be discarded or applied, and preserv
   );
   expect((await request.patch(`/api/ai-quiz-drafts/${id}`, { data: { questions: editedQuestions } })).status()).toBe(200);
 
-  const proposed = await request.post(`/api/ai-quiz-drafts/${id}/generate`, {
+  const revised = await request.post(`/api/ai-quiz-drafts/${id}/generate`, {
     data: { instruction: "حسّن صياغة السؤالين الأول والثالث", mode: "targeted" },
   });
-  expect(proposed.status()).toBe(200);
-  const proposedData = await proposed.json();
-  expect(proposedData.response.type).toBe("revision");
-  expect(proposedData.draft.questions[1].text).toBe("تصحيح المعلّم للسؤال الثاني");
-  expect(proposedData.draft.pendingRevision.mode).toBe("targeted");
-  expect(proposedData.draft.pendingRevision.changes.map((change: { questionIndex: number }) => change.questionIndex)).toEqual([0, 2]);
-  expect(proposedData.draft.messages).toHaveLength(4);
-  const blockedSave = await request.post(`/api/ai-quiz-drafts/${id}/save`);
-  expect(blockedSave.status()).toBe(400);
-  expect((await blockedSave.json()).error).toBe("revision-pending");
+  expect(revised.status()).toBe(200);
+  const revisedData = await revised.json();
+  expect(revisedData.response.type).toBe("revision");
+  expect(revisedData.draft.questions[0].text).toContain("مراجعة موجهة");
+  expect(revisedData.draft.questions[1].text).toBe("تصحيح المعلّم للسؤال الثاني");
+  expect(revisedData.draft.questions[2].text).toContain("مراجعة موجهة");
+  expect(revisedData.draft.messages).toHaveLength(4);
 
-  const beforeDiscard = await request.get(`/api/ai-quiz-drafts/${id}`);
-  expect((await beforeDiscard.json()).draft.pendingRevision).not.toBeNull();
-  const discarded = await request.post(`/api/ai-quiz-drafts/${id}/revision`, { data: { action: "discard" } });
-  expect(discarded.status()).toBe(200);
-  const afterDiscard = (await discarded.json()).draft;
-  expect(afterDiscard.pendingRevision).toBeNull();
-  expect(afterDiscard.questions[1].text).toBe("تصحيح المعلّم للسؤال الثاني");
+  const confirm = await request.post(`/api/ai-quiz-drafts/${id}/generate`, {
+    data: { instruction: "تمام، الأسئلة مناسبة، احفظ الاختبار", mode: "targeted" },
+  });
+  expect(confirm.status()).toBe(200);
+  const confirmData = await confirm.json();
+  expect(confirmData.response.type).toBe("confirm_save");
+  expect(confirmData.draft.questions).toHaveLength(3);
 
-  const secondProposal = await request.post(`/api/ai-quiz-drafts/${id}/generate`, {
-    data: { instruction: "حسّن صياغة السؤالين الأول والثالث", mode: "targeted" },
-  });
-  expect(secondProposal.status()).toBe(200);
-  const applied = await request.post(`/api/ai-quiz-drafts/${id}/revision`, { data: { action: "apply" } });
-  expect(applied.status()).toBe(200);
-  const appliedData = await applied.json();
-  expect(appliedData.draft.pendingRevision).toBeNull();
-  expect(appliedData.draft.questions[0].text).toContain("مراجعة موجهة");
-  expect(appliedData.draft.questions[1].text).toBe("تصحيح المعلّم للسؤال الثاني");
-  expect(appliedData.draft.questions[2].text).toContain("مراجعة موجهة");
+  const saved = await request.post(`/api/ai-quiz-drafts/${id}/save`);
+  expect(saved.status()).toBe(201);
+  const savedData = await saved.json();
+  expect(savedData.quiz.questions).toHaveLength(3);
+  expect((await request.get(`/api/ai-quiz-drafts/${id}`)).status()).toBe(404);
+  await request.delete(`/api/quizzes/${savedData.quiz.id}`);
 
-  const staleProposal = await request.post(`/api/ai-quiz-drafts/${id}/generate`, {
-    data: { instruction: "حسّن صياغة السؤال الأول", mode: "targeted" },
+  // a save request with no questions yields a clarification and saves nothing
+  const secondStart = await request.post("/api/ai-quiz-drafts");
+  const secondId = (await secondStart.json()).draft.id as string;
+  const premature = await request.post(`/api/ai-quiz-drafts/${secondId}/generate`, {
+    data: { instruction: "احفظ الاختبار", mode: "initial" },
   });
-  expect(staleProposal.status()).toBe(200);
-  await request.patch(`/api/ai-quiz-drafts/${id}`, {
-    data: { questions: appliedData.draft.questions.map((question: Record<string, unknown>, index: number) => index === 0 ? { ...question, text: "تصحيح أحدث من المعلّم" } : question) },
-  });
-  const conflictApply = await request.post(`/api/ai-quiz-drafts/${id}/revision`, { data: { action: "apply" } });
-  expect(conflictApply.status()).toBe(200);
-  const conflictData = await conflictApply.json();
-  expect(conflictData.conflictedQuestionIndexes).toEqual([0]);
-  expect(conflictData.draft.questions[0].text).toBe("تصحيح أحدث من المعلّم");
+  expect(premature.status()).toBe(200);
+  expect((await premature.json()).response.type).toBe("clarification");
+  const blocked = await request.post(`/api/ai-quiz-drafts/${secondId}/save`);
+  expect(blocked.status()).toBe(400);
+  expect((await blocked.json()).error).toBe("questions-required");
+  await request.delete(`/api/ai-quiz-drafts/${secondId}`);
 
-  const newSet = await request.post(`/api/ai-quiz-drafts/${id}/generate`, {
-    data: { instruction: "أنشئ مجموعة جديدة عن آداب التلاوة", questionCount: 2, mode: "new-set" },
-  });
-  expect(newSet.status()).toBe(200);
-  const newSetData = await newSet.json();
-  expect(newSetData.draft.pendingRevision.mode).toBe("new-set");
-  expect(newSetData.draft.questions[0].text).toBe("تصحيح أحدث من المعلّم");
-  expect((await request.post(`/api/ai-quiz-drafts/${id}/revision`, { data: { action: "discard" } })).status()).toBe(200);
-  expect((await request.patch(`/api/ai-quiz-drafts/${id}`, { data: { title: "عنوان حالي" } })).status()).toBe(200);
-  const appliedNewSet = await request.post(`/api/ai-quiz-drafts/${id}/generate`, {
-    data: { instruction: "أنشئ مجموعة جديدة عن آداب التلاوة", questionCount: 2, mode: "new-set" },
-  });
-  expect(appliedNewSet.status()).toBe(200);
-  const appliedNewSetResponse = await request.post(`/api/ai-quiz-drafts/${id}/revision`, { data: { action: "apply" } });
-  expect(appliedNewSetResponse.status()).toBe(200);
-  expect((await appliedNewSetResponse.json()).draft.title).toBe("مبادئ القرآن الكريم");
-  const afterNewSet = await request.get(`/api/ai-quiz-drafts/${id}`);
-  expect((await afterNewSet.json()).draft.questions).toHaveLength(2);
   expect((await request.get("/api/ai-quiz-drafts/not-owned-by-this-teacher")).status()).toBe(404);
-  expect((await request.post("/api/ai-quiz-drafts/not-owned-by-this-teacher/revision", { data: { action: "apply" } })).status()).toBe(404);
-  expect((await request.delete(`/api/ai-quiz-drafts/${id}`)).status()).toBe(200);
 });
 
-test("teacher can review, edit, resume, and explicitly save a prompt-only draft", async ({ page }, testInfo) => {
+test("teacher chats to generate, revise, resume, and explicitly save a quiz", async ({ page }) => {
   const start = await page.request.post("/api/ai-quiz-drafts");
   const id = (await start.json()).draft.id as string;
   await page.goto(`/ai-quiz-drafts/${id}`);
   await expect(page.getByRole("heading", { name: "محادثة مسودة اختبار" })).toBeVisible({ timeout: 15000 });
+  await page.waitForLoadState("networkidle");
 
-  const title = `أسئلة التلاوة ${testInfo.project.name}-${testInfo.workerIndex}-${testInfo.repeatEachIndex}-${Date.now()}`;
-  await page.getByLabel("تعليماتك").fill(instruction);
-  await page.locator('input[type="number"]').fill("2");
-  const generation = page.waitForResponse(
-    (response) => response.request().method() === "POST" && response.url().endsWith(`/api/ai-quiz-drafts/${id}/generate`),
-  );
-  await page.getByRole("button", { name: "أنشئ مسودة الأسئلة" }).click();
-  expect((await generation).status()).toBe(200);
-   await expect(page.getByText("أُعدّت المسودة. راجع الأسئلة ثم احفظها كاختبار.")).toBeVisible({ timeout: 15000 });
-   await expect(page.getByRole("region", { name: "المسودة القابلة للتحرير" }).getByText("المعرفة العامة فقط").first()).toBeVisible();
-   await expect(page.getByLabel("نص السؤال 1")).toBeVisible();
+  await page.getByLabel("رسالتك").fill(instruction);
+  await page.getByLabel("عدد الأسئلة").fill("2");
+  await page.getByRole("button", { name: "إرسال" }).click();
+  const cards = page.getByRole("region", { name: "الأسئلة الحالية" });
+  await expect(cards).toBeVisible({ timeout: 15000 });
+  await expect(cards.getByText(/اختيار من متعدد/).first()).toBeVisible();
+  await expect(page.getByText("أعددت مسودة أسئلة عربية للمراجعة.")).toBeVisible();
 
-   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "المحادثة" }).click();
-   await page.getByLabel("تعليماتك").fill("حسّن صياغة السؤال الأول");
-   await page.getByRole("button", { name: "اقترح مراجعة موجهة" }).click();
-   await expect(page.getByRole("heading", { name: "معاينة المراجعة المقترحة" })).toBeVisible({ timeout: 15000 });
-   await page.getByRole("button", { name: "تجاهل المراجعة" }).click();
-   await expect(page.getByRole("heading", { name: "معاينة المراجعة المقترحة" })).toBeHidden();
+  // a revision request updates the cards directly, no preview step
+  await page.getByLabel("رسالتك").fill("حسّن صياغة السؤال الأول");
+  await page.getByRole("button", { name: "إرسال" }).click();
+  await expect(cards.getByText("(مراجعة موجهة)").first()).toBeVisible({ timeout: 15000 });
 
-   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "المحادثة" }).click();
-   await page.getByRole("button", { name: "اقترح مراجعة موجهة" }).click();
-   await expect(page.getByRole("heading", { name: "معاينة المراجعة المقترحة" })).toBeVisible({ timeout: 15000 });
-   await page.getByRole("button", { name: "تطبيق المراجعة" }).click();
-   await expect(page.getByText("تم تطبيق المراجعة على المسودة.")).toBeVisible({ timeout: 15000 });
-
-   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "المسودة", exact: true }).click();
-   await page.getByLabel("نوع السؤال 1").selectOption("INPUT");
-   await page.getByRole("button", { name: "خفض السؤال 1" }).click();
-   await expect(page.getByLabel("نوع السؤال 2")).toHaveValue("INPUT");
-   await page.getByLabel("نوع السؤال 2").selectOption("MCQ");
-   const editedQuestion = page.getByRole("article").nth(1);
-   await editedQuestion.getByPlaceholder("الخيار 1").fill("إجابة أولى من المعلّم");
-   await editedQuestion.getByPlaceholder("الخيار 2").fill("إجابة ثانية من المعلّم");
-   await editedQuestion.getByLabel("الإجابة الصحيحة 2").check();
-
-   await page.getByLabel("عنوان الاختبار").fill(title);
-  await page.getByLabel("نص السؤال 1").fill("ما السلوك الصحيح عند تلاوة القرآن؟");
-  await page.getByRole("button", { name: "حفظ تعديلات المسودة" }).click();
-  await expect(page.getByText("تم حفظ تعديلات المسودة.")).toBeVisible();
-
+  // resuming the conversation keeps the thread and the current cards
   await page.reload();
-  await expect(page.getByLabel("عنوان الاختبار")).toHaveValue(title);
-  await expect(page.getByLabel("نص السؤال 1")).toHaveValue("ما السلوك الصحيح عند تلاوة القرآن؟");
+  await expect(page.getByRole("region", { name: "الأسئلة الحالية" })).toBeVisible({ timeout: 15000 });
+  await page.waitForLoadState("networkidle");
 
-  await page.getByRole("button", { name: "حفظ كاختبار" }).click();
-  await expect(page.getByRole("heading", { name: "مكتبة الأسئلة" })).toBeVisible();
-  await expect(page.getByRole("link", { name: title })).toBeVisible();
+  // explicit confirmation in chat saves the quiz and posts the visit link
+  await page.getByLabel("رسالتك").fill("تمام، الأسئلة مناسبة، احفظ الاختبار");
+  await page.getByRole("button", { name: "إرسال" }).click();
+  await expect(page.getByText("تم حفظ اختبارك ✅")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("انتهت هذه المحادثة بعد الحفظ.")).toBeVisible();
+
+  const visitLink = page.getByRole("link", { name: "زيارة الاختبار" });
+  await expect(visitLink).toBeVisible();
+  const href = (await visitLink.getAttribute("href")) as string;
+  expect(href).toMatch(/^\/quizzes\//);
+
+  const detail = await page.request.get(href);
+  expect(detail.status()).toBe(200);
+  const savedQuiz = ((await (await page.request.get("/api/quizzes")).json()).quizzes as { id: string }[]).find(
+    (quiz) => href.endsWith(quiz.id),
+  );
+  expect(savedQuiz).toBeTruthy();
+  await page.request.delete(href);
 });
 
 test("teacher manages temporary sources, source policies, and source-grounded generation", async ({ request }) => {
@@ -386,45 +348,39 @@ test("teacher manages temporary sources, source policies, and source-grounded ge
   await request.delete(`/api/quizzes/${savedQuiz.id}`);
 });
 
-test("draft page manages sources and switches source policy from the conversation panel", async ({ page }, testInfo) => {
+test("draft page manages sources and source policy from the composer", async ({ page }, testInfo) => {
   const start = await page.request.post("/api/ai-quiz-drafts");
   const id = (await start.json()).draft.id as string;
   await page.goto(`/ai-quiz-drafts/${id}`);
   await expect(page.getByRole("heading", { name: "محادثة مسودة اختبار" })).toBeVisible({ timeout: 15000 });
-  await page.getByText("المصادر وسياسة التوليد").click();
+  await page.waitForLoadState("networkidle");
 
-  const policyGroup = page.getByRole("radio", { name: /المصادر المرفوعة فقط/ });
-  const plusPolicy = page.getByRole("radio", { name: /المصادر المرفوعة مع المعرفة العامة/ });
-  await expect(page.getByRole("radio", { name: /المعرفة العامة فقط/ })).toBeChecked();
-  await expect(page.getByRole("heading", { name: "المصادر المؤقتة" })).toBeVisible();
+  const policySelect = page.getByLabel("سياسة المصدر");
+  await expect(policySelect).toHaveValue("GENERAL_KNOWLEDGE_ONLY");
 
+  await page.getByLabel("اسم المصدر (اختياري)").fill("ملخص الفاتحة");
   await page.getByLabel("نص المصدر الملصق").fill("سورة الفاتحة سبع آيات وتسمى أم الكتاب.");
   await page.getByRole("button", { name: "إضافة النص الملصق" }).click();
   await expect(page.getByText("تمت إضافة المصدر إلى المسودة.")).toBeVisible({ timeout: 15000 });
-  await expect(page.getByRole("list", { name: "قائمة المصادر" }).getByText("نص ملصق", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "إزالة المصدر ملخص الفاتحة" })).toBeVisible();
 
-  await policyGroup.check();
-  await page.getByLabel("تعليماتك").fill("أنشئ أسئلة عن المصدر المرفوع");
-  await page.locator('input[type="number"]').fill("2");
-  await page.getByRole("button", { name: "أنشئ مسودة الأسئلة" }).click();
-  await expect(page.getByText("أُعدّت المسودة. راجع الأسئلة ثم احفظها كاختبار.")).toBeVisible({ timeout: 15000 });
-  await expect(page.getByText(/من المصدر المرفوع/).first()).toBeVisible();
+  await policySelect.selectOption("SOURCES_ONLY");
+  await page.getByLabel("رسالتك").fill("أنشئ أسئلة عن المصدر المرفوع");
+  await page.getByLabel("عدد الأسئلة").fill("2");
+  await page.getByRole("button", { name: "إرسال" }).click();
+  await expect(
+    page.getByRole("region", { name: "الأسئلة الحالية" }).getByText(/من المصدر المرفوع/).first(),
+  ).toBeVisible({ timeout: 15000 });
 
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "المحادثة" }).click();
-  await page.getByRole("button", { name: "إزالة المصدر نص ملصق" }).click();
+  await page.locator("#source-file").setInputFiles({
+    name: "درس-التلاوة.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("أحكام التلاوة: المد الواجب، الغنة، القلقلة.", "utf8"),
+  });
+  await expect(page.getByRole("button", { name: "إزالة المصدر درس-التلاوة.txt" })).toBeVisible({ timeout: 15000 });
+
+  await page.getByRole("button", { name: "إزالة المصدر ملخص الفاتحة" }).click();
   await expect(page.getByText("تمت إزالة المصدر من المسودة.")).toBeVisible({ timeout: 15000 });
-  await expect(page.getByRole("list", { name: "قائمة المصادر" }).getByText("لا توجد مصادر مضافة.")).toBeVisible();
-
-  await plusPolicy.check();
-  await expect(page.getByText("أضف مصدرًا واحدًا على الأقل حتى تُبنى الأسئلة من المصادر.")).toBeVisible();
-  await page.getByLabel("تعليماتك").fill("حسّن صياغة السؤال الأول");
-  await page.getByRole("button", { name: "اقترح مراجعة موجهة" }).click();
-  await expect(page.getByRole("status").filter({ hasText: /سياسة المصادر تتطلب مصدرًا مرفوعًا/ })).toBeVisible({ timeout: 15000 });
-
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "المحادثة" }).click();
-  await page.getByRole("radio", { name: /المعرفة العامة فقط/ }).check();
-  await page.getByRole("button", { name: "اقترح مراجعة موجهة" }).click();
-  await expect(page.getByRole("heading", { name: "معاينة المراجعة المقترحة" })).toBeVisible({ timeout: 15000 });
 
   if (testInfo.project.name === "mobile") {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -434,15 +390,15 @@ test("draft page manages sources and switches source policy from the conversatio
   await expect(page.getByRole("heading", { name: "مسودات الاختبارات" })).toBeVisible();
 });
 
-test("mobile draft page provides Conversation and Draft tabs without overflow", async ({ page }, testInfo) => {
+test("mobile draft page shows the chat composer without overflow", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "mobile layout check");
   await page.goto("/ai-quiz-drafts");
   await Promise.all([
     page.waitForURL(/\/ai-quiz-drafts\/[^/]+$/, { timeout: 15000 }),
     page.getByRole("button", { name: "مسودة جديدة" }).click(),
   ]);
-  await expect(page.getByRole("button", { name: "المحادثة" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "المسودة", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "محادثة مسودة اختبار" })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByLabel("رسالتك")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   await page.getByRole("button", { name: "حذف المسودة" }).click();
@@ -583,7 +539,7 @@ test("provenance: failed save keeps the draft and its sources; discard deletes t
   expect(libraryAfter.some((row) => row.title === failedTitle)).toBe(false);
 });
 
-test("teacher sees excerpt and page reference during draft review and on the saved Quiz", async ({ page }, testInfo) => {
+test("teacher sees excerpt and page reference in the chat cards and on the saved Quiz", async ({ page }) => {
   const id = await startSourceDraft(page.request, `اختبار الدليل ${Date.now()}`);
   const draft = ((await (await page.request.get(`/api/ai-quiz-drafts/${id}`)).json()).draft as {
     questions: Record<string, unknown>[];
@@ -600,69 +556,59 @@ test("teacher sees excerpt and page reference during draft review and on the sav
 
   await page.goto(`/ai-quiz-drafts/${id}`);
   await expect(page.getByRole("heading", { name: "محادثة مسودة اختبار" })).toBeVisible({ timeout: 15000 });
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "المسودة", exact: true }).click();
-  await expect(
-    page.getByRole("region", { name: "المسودة القابلة للتحرير" }).getByText(/ملخص الفاتحة/).first(),
-  ).toBeVisible();
+  const cards = page.getByRole("region", { name: "الأسئلة الحالية" });
+  await expect(cards.getByText(/ملخص الفاتحة/).first()).toBeVisible();
   await expect(page.getByText(/الصفحة الثالثة/).first()).toBeVisible();
   await expect(page.getByText(/«سورة الفاتحة سبع آيات/).first()).toBeVisible();
 
-  const title = `اختبار الدليل المحفوظ ${Date.now()}`;
-  await page.getByLabel("عنوان الاختبار").fill(title);
-  await page.getByRole("button", { name: "حفظ كاختبار" }).click();
-  await expect(page.getByRole("heading", { name: "مكتبة الأسئلة" })).toBeVisible({ timeout: 15000 });
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("رسالتك").fill("تمام، احفظ الاختبار");
+  await page.getByRole("button", { name: "إرسال" }).click();
+  const visitLink = page.getByRole("link", { name: "زيارة الاختبار" });
+  await expect(visitLink).toBeVisible({ timeout: 15000 });
+  const href = (await visitLink.getAttribute("href")) as string;
 
-  const library = ((await (await page.request.get("/api/quizzes")).json()).quizzes as { id: string; title: string }[]);
-  const savedQuiz = library.find((row) => row.title === title);
-  expect(savedQuiz).toBeTruthy();
-  await page.goto(`/quizzes/${savedQuiz!.id}`);
+  await page.goto(href);
   await expect(page.getByText(/ملخص الفاتحة/).first()).toBeVisible({ timeout: 15000 });
   await expect(page.getByText(/الصفحة الثالثة/).first()).toBeVisible({ timeout: 15000 });
   await expect(page.getByText(/«سورة الفاتحة سبع آيات/).first()).toBeVisible({ timeout: 15000 });
-  await page.request.delete(`/api/quizzes/${savedQuiz!.id}`);
+  await page.request.delete(`/api/quizzes/${href.split("/").pop()}`);
 });
 
-test("complete teacher journey: source input, Source Policy, generation, revision, direct edit, Save as Quiz", async ({ page }, testInfo) => {
+test("complete teacher journey: source input, Source Policy, generation, chat revision, save via confirmation", async ({ page }) => {
   const start = await page.request.post("/api/ai-quiz-drafts");
   const id = ((await start.json()).draft as { id: string }).id;
   await page.goto(`/ai-quiz-drafts/${id}`);
   await expect(page.getByRole("heading", { name: "محادثة مسودة اختبار" })).toBeVisible({ timeout: 15000 });
+  await page.waitForLoadState("networkidle");
 
-  const title = `رحلة المصدر ${testInfo.project.name}-${testInfo.workerIndex}-${Date.now()}`;
-
-  await page.getByText("المصادر وسياسة التوليد").click();
   await page.getByLabel("نص المصدر الملصق").fill("سورة الفاتحة سبع آيات، وتسمى أم الكتاب، وهي أول سورة في المصحف.");
   await page.getByRole("button", { name: "إضافة النص الملصق" }).click();
   await expect(page.getByText("تمت إضافة المصدر إلى المسودة.")).toBeVisible({ timeout: 15000 });
 
-  await page.getByRole("radio", { name: /المصادر المرفوعة فقط/ }).check();
-  await page.getByLabel("تعليماتك").fill("أنشئ أسئلة من المصدر المرفوع عن سورة الفاتحة");
-  await page.locator('input[type="number"]').fill("2");
-  await page.getByRole("button", { name: "أنشئ مسودة الأسئلة" }).click();
-  await expect(page.getByText("أُعدّت المسودة. راجع الأسئلة ثم احفظها كاختبار.")).toBeVisible({ timeout: 15000 });
-  await expect(page.getByRole("region", { name: "المسودة القابلة للتحرير" }).getByText(/من المصدر المرفوع/).first()).toBeVisible();
+  await page.getByLabel("سياسة المصدر").selectOption("SOURCES_ONLY");
+  await page.getByLabel("رسالتك").fill("أنشئ أسئلة من المصدر المرفوع عن سورة الفاتحة");
+  await page.getByLabel("عدد الأسئلة").fill("2");
+  await page.getByRole("button", { name: "إرسال" }).click();
+  await expect(
+    page.getByRole("region", { name: "الأسئلة الحالية" }).getByText(/من المصدر المرفوع/).first(),
+  ).toBeVisible({ timeout: 15000 });
 
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "المحادثة" }).click();
-  await page.getByLabel("تعليماتك").fill("حسّن صياغة السؤال الثاني");
-  await page.getByRole("button", { name: "اقترح مراجعة موجهة" }).click();
-  await expect(page.getByRole("heading", { name: "معاينة المراجعة المقترحة" })).toBeVisible({ timeout: 15000 });
-  await page.getByRole("button", { name: "تطبيق المراجعة" }).click();
-  await expect(page.getByText("تم تطبيق المراجعة على المسودة.")).toBeVisible({ timeout: 15000 });
+  await page.getByLabel("رسالتك").fill("حسّن صياغة السؤال الثاني");
+  await page.getByRole("button", { name: "إرسال" }).click();
+  await expect(
+    page.getByRole("region", { name: "الأسئلة الحالية" }).getByText("(مراجعة موجهة)").first(),
+  ).toBeVisible({ timeout: 15000 });
 
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "المسودة", exact: true }).click();
-  await page.getByLabel("عنوان الاختبار").fill(title);
-  await page.getByLabel("نص السؤال 1").fill("بكم آيةٍ تبدأ سورة الفاتحة؟");
-  await page.getByRole("button", { name: "حفظ تعديلات المسودة" }).click();
-  await expect(page.getByText("تم حفظ تعديلات المسودة.")).toBeVisible({ timeout: 15000 });
+  await page.getByLabel("رسالتك").fill("تمام، احفظ الاختبار");
+  await page.getByRole("button", { name: "إرسال" }).click();
+  const visitLink = page.getByRole("link", { name: "زيارة الاختبار" });
+  await expect(visitLink).toBeVisible({ timeout: 15000 });
+  const href = (await visitLink.getAttribute("href")) as string;
 
-  await page.getByRole("button", { name: "حفظ كاختبار" }).click();
-  await expect(page.getByRole("heading", { name: "مكتبة الأسئلة" })).toBeVisible({ timeout: 15000 });
-  await expect(page.getByRole("link", { name: title })).toBeVisible();
-
-  const library = ((await (await page.request.get("/api/quizzes")).json()).quizzes as { id: string; title: string }[]);
-  const savedQuiz = library.find((row) => row.title === title);
-  expect(savedQuiz).toBeTruthy();
-  await page.request.delete(`/api/quizzes/${savedQuiz!.id}`);
+  const detail = await page.request.get(href);
+  expect(detail.status()).toBe(200);
+  await page.request.delete(href);
 });
 
 test("an AI-created Quiz runs in Practice and Competition; INPUT Questions stay Practice-only", async ({ page }) => {
@@ -830,9 +776,9 @@ test("rate limit: the per-Teacher hourly allowance refuses generation and explai
     // the Teacher-facing page explains the limit in Arabic
     await page.goto(`/ai-quiz-drafts/${id}`);
     await expect(page.getByRole("heading", { name: "محادثة مسودة اختبار" })).toBeVisible({ timeout: 15000 });
-    await page.getByLabel("تعليماتك").fill(instruction);
-    await page.locator('input[type="number"]').fill("1");
-    await page.getByRole("button", { name: "أنشئ مسودة الأسئلة" }).click();
+    await page.waitForLoadState("networkidle");
+    await page.getByLabel("رسالتك").fill(instruction);
+    await page.getByRole("button", { name: "إرسال" }).click();
     await expect(page.getByText("لقد بلغت الحد المسموح من عمليات توليد الأسئلة")).toBeVisible({ timeout: 15000 });
 
     await page.request.delete(`/api/ai-quiz-drafts/${id}`);

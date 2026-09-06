@@ -55,7 +55,7 @@ The AI is a drafting assistant, not the publisher of a Quiz. The application own
 
 ## Implementation Decisions
 
-- The highest seam is one server-side AI Quiz Draft Conversation service. It owns draft state, source policy, conversation turns, AI Revisions, direct-edit application, cleanup, and final-save preparation.
+- The highest seam is one server-side AI Quiz Draft Conversation service. It owns draft state, source policy, conversation turns, AI Revisions applied directly to the draft, and final-save preparation.
 - Authenticated Next route handlers provide the Teacher boundary and delegate to that service. Every read and write is scoped to the current Teacher, following the existing ownership pattern.
 - A provider adapter hides GLM’s model-specific endpoint and response format. The application does not expose provider credentials or model selection to the browser.
 - The application owns conversation state. GLM is a stateless model provider for this feature, not the source of truth for drafts or messages.
@@ -65,9 +65,10 @@ The AI is a drafting assistant, not the publisher of a Quiz. The application own
 - Generated content is Arabic-only, regardless of the language of the interface input or source document.
 - The initial generation controls default to 10 Questions, medium difficulty, and `MCQ` plus `TRUE_FALSE`. The allowed Question count is 1–30. `INPUT` is opt-in and Practice-only.
 - The AI may ask a clarifying Question only when required to avoid guessing scope. Otherwise it returns a complete structured draft rather than partial streamed Questions.
-- The AI response must distinguish clarification, initial draft, targeted AI Revision, unsupported request, and provider failure. The UI must not treat prose that lacks a valid structured draft as saved Quiz content.
-- Each AI Revision is proposed against the current draft, identifies the requested changes, and requires explicit application. A revision does not silently replace the current draft.
-- Direct Teacher edits are applied to the current draft and become authoritative. A later AI Revision must use the current draft as input and preserve unrelated direct edits.
+- The AI response must distinguish clarification, initial draft, targeted AI Revision applied directly to the draft, explicit save confirmation (`confirm_save`), unsupported request, and provider failure. The UI must not treat prose that lacks a valid structured draft as saved Quiz content.
+- The UI is a single chat column: Teacher requests and assistant replies render as a thread, generated Questions render as read-only cards in the thread, and every requested change applies directly to the draft. The thread history is the change record; there is no separate revision preview or direct-edit form.
+- A targeted AI Revision applies its changes directly to the current draft questions and preserves untouched Questions. There is no pending revision state; an unwanted change is undone by asking the assistant for another change.
+- A Quiz is created only when the Teacher explicitly confirms saving in chat. The provider classifies that confirmation as `confirm_save`, the client calls the save route, and the route’s server-side validation remains the final gate. The confirmation message with the saved Quiz link is client-local because the conversation is deleted on save.
 - The draft model must represent title, description, ordered Questions, Question kinds, options, correct answers, time limits, and compact Source Evidence or supplemental status.
 - Source Evidence includes a supporting excerpt and document page or section when available. It is visible to Teachers and excluded from Student-facing Quiz responses.
 - Saved Questions retain compact Source Evidence but not the original source file. Source files and the conversation are deleted when the Teacher saves or discards the draft.
@@ -75,7 +76,8 @@ The AI is a drafting assistant, not the publisher of a Quiz. The application own
 - Server-side validation is mandatory before saving. The AI output is untrusted and cannot bypass existing Question constraints: MCQ has at most four options and exactly one correct option, TRUE_FALSE uses the existing two options, and INPUT has no options and cannot be used in a Competition.
 - Drafts, source metadata, and conversations are private to the creating Teacher. Other Teachers cannot access them before save.
 - The service applies per-Teacher rate limits, maximum document and extracted-text sizes, a maximum of 30 Questions per generation, a limit on concurrent generations, and a cross-source cap on total source text sent to the provider. Defaults: 30 generations per hour, 2 concurrent generations per Teacher, 5 MB per file, 60,000 extracted characters per source, 120,000 total source characters; all configurable through server environment variables, and limit responses explain in Arabic whether the Teacher should wait, retry, reduce the request, or change the Source Policy.
-- The desktop UI uses a conversation panel beside a live editable draft preview. Mobile uses Conversation and Draft tabs. Actions are Apply Revision, Discard Revision, direct edit, and Save as Quiz.
+- The desktop and mobile UI use one chat column: the conversation thread with read-only question cards, a composer with attachment and Source Policy controls, and a typing indicator while the assistant works. Actions are chat requests, source add/remove, and explicit save confirmation.
+- Streaming keeps the connection alive during generation; partial Questions are not rendered, and cards appear after the complete structured draft passes server validation.
 - PDF, DOCX, TXT, and Markdown are supported in v1. Scanned PDFs and images are out of scope until OCR is deliberately added.
 - Document extraction should use the smallest compatible set of existing or standard dependencies. Large source material must be bounded or reduced to relevant extracted text before a provider request.
 - The service should use a structured response contract validated at the server boundary. The contract must support a clarification response without Questions and a draft/revision response with complete valid Question data.
@@ -83,7 +85,7 @@ The AI is a drafting assistant, not the publisher of a Quiz. The application own
 ## Testing Decisions
 
 - Tests must exercise externally visible behavior through route handlers and the Teacher-facing UI; they should not assert private helper structure or provider SDK internals.
-- Add route-level tests for draft ownership, Source Policy handling, source add/remove, clarification responses, initial generation, targeted revisions, direct edits, apply/discard, save, and cleanup.
+- Add route-level tests for draft ownership, Source Policy handling, source add/remove, clarification responses, initial generation, targeted revisions applied directly, save confirmation via `confirm_save`, premature-save refusal, save, and cleanup.
 - Add validation tests proving malformed AI output cannot save a Quiz: missing title, empty Question text, invalid kinds, too many options, zero or multiple MCQ correct answers, and INPUT options.
 - Add provider-boundary tests with a deterministic fake provider so normal tests do not spend GLM allowance or depend on network availability.
 - Add tests that verify the server sends extracted text and instructions only when the selected Source Policy allows it, and never sends the original file object to the provider adapter.
@@ -91,7 +93,7 @@ The AI is a drafting assistant, not the publisher of a Quiz. The application own
 - Add tests for source-file and conversation deletion on save and discard, including failure handling that does not leave a saved Quiz without its expected final state.
 - Add tests proving a Teacher cannot read or mutate another Teacher’s draft, source metadata, or conversation.
 - Add tests proving `INPUT` Questions are flagged as Practice-only and cannot be launched in a Competition.
-- Add Playwright coverage for the main Teacher flow: start conversation, add source or prompt, choose Source Policy, generate, apply a targeted revision, directly edit, and Save as Quiz.
+- Add Playwright coverage for the main Teacher flow: start the chat, add a source or prompt, choose Source Policy, generate, request a targeted revision via chat, and confirm the save in chat so the Quiz is created with its visit link.
 - Extend existing Quiz CRUD and launch coverage to prove an AI-created Quiz behaves like a manually created Quiz in Practice and Competition flows.
 - Use representative Arabic/Quran fixtures for structured-output tests, including source excerpts, page references, and unsupported requests.
 - Before selecting the production model, run a small evaluation outside the normal test suite against representative Arabic/Quran prompts and inspect Question accuracy, source grounding, and structured-output reliability.
