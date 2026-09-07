@@ -131,7 +131,6 @@ export async function submitAnswer(
   const already = await prisma.sessionAnswer.findFirst({
     where: { sessionId, participantId, questionId: question.id },
   });
-  if (already) return { accepted: false, correct: already.isCorrect, points: 0, bonus: 0, streak: 0 };
 
   const correctOption = question.options.find((o) => o.isCorrect);
   const correct = correctOption?.id === chosenOptionId;
@@ -139,12 +138,37 @@ export async function submitAnswer(
   const participant = await prisma.sessionParticipant.findUniqueOrThrow({
     where: { id: participantId },
   });
-  const streak = correct ? participant.streak + 1 : 0;
-  const bonus = correct ? Math.min(100 * Math.max(0, streak - 1), 500) : 0;
 
   const limitMs = question.timeLimitSec * 1000;
   const clampedMs = Math.min(Math.max(timeMs, 0), limitMs);
   const remaining = 1 - clampedMs / limitMs;
+
+  // a second pick within the question window overwrites the first answer:
+  // last timeMs counts, score adjusts by the points delta, streak recomputed
+  if (already) {
+    const priorStreak = already.isCorrect ? participant.streak - 1 : participant.streak;
+    const streak = correct ? priorStreak + 1 : 0;
+    const bonus = correct ? Math.min(100 * Math.max(0, streak - 1), 500) : 0;
+    const points = correct ? Math.round(500 + 500 * remaining) + bonus : 0;
+    await prisma.$transaction([
+      prisma.sessionAnswer.update({
+        where: { id: already.id },
+        data: { chosenOptionId, isCorrect: correct, points, timeMs: clampedMs },
+      }),
+      prisma.sessionParticipant.update({
+        where: { id: participantId },
+        data: {
+          totalScore: { decrement: already.points - points },
+          streak,
+        },
+      }),
+    ]);
+    return { accepted: true, correct, points, bonus, streak };
+  }
+
+  const streak = correct ? participant.streak + 1 : 0;
+  const bonus = correct ? Math.min(100 * Math.max(0, streak - 1), 500) : 0;
+
   const points = correct ? Math.round(500 + 500 * remaining) + bonus : 0;
 
   await prisma.$transaction([

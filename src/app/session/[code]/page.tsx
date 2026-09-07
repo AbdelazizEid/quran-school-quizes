@@ -10,6 +10,7 @@ import Podium from "@/components/Podium";
 import VoteBar from "@/components/VoteBar";
 import Confetti from "@/components/Confetti";
 import { sfx } from "@/lib/sfx";
+import { TILE_COLORS } from "@/lib/tiles";
 import { CORRECT_CHEERS, WRONG_PATS, pickOne, streakCheer } from "@/lib/cheer";
 
 type JoinResult = { ok: boolean; participantId?: string; nickname?: string; error?: string };
@@ -26,7 +27,6 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
   const [timeUp, setTimeUp] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const startedAtRef = useRef<number>(0);
-  const answeredRef = useRef(false);
   const [burst, setBurst] = useState(0);
   const [cheerLine, setCheerLine] = useState("");
   const reduced = useReducedMotion();
@@ -78,7 +78,6 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
   useEffect(() => {
     if (state?.phase === "QUESTION" && state.question) {
       startedAtRef.current = Date.now();
-      answeredRef.current = false;
       setLastResult(null);
       setPickedId(null);
       setTimeUp(false);
@@ -118,8 +117,7 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
   }, [state?.roster?.length]);
 
   function pick(optionId: string) {
-    if (answeredRef.current || timeUp) return;
-    answeredRef.current = true;
+    if (timeUp) return;
     setPickedId(optionId);
     const timeMs = Date.now() - startedAtRef.current;
     socketRef.current?.emit("answer", { optionId, timeMs }, (r: AnswerResult) => {
@@ -200,29 +198,46 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
               {state.question.text}
             </h1>
             <div className="mt-10 grid gap-4 sm:grid-cols-2">
-              {state.question.options.map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => pick(o.id)}
-                  disabled={answeredRef.current || timeUp}
-                  className={`py-6 text-xl border-2 rounded-sm bg-[color:var(--background)] transition-transform active:scale-[0.98] disabled:opacity-40 ${
-                    pickedId === o.id
-                      ? "border-[color:var(--gold)] bg-[color:var(--wash)]"
-                      : "border-[color:var(--lapis)] hover:bg-[color:var(--wash)]"
-                  }`}
-                >
-                  {o.text}
-                </button>
-              ))}
+              {state.question.options.map((o, i) => {
+                const tile = TILE_COLORS[i % TILE_COLORS.length];
+                const picked = pickedId === o.id;
+                return (
+                  <button
+                    key={o.id}
+                    onClick={() => pick(o.id)}
+                    disabled={timeUp}
+                    className={`relative rounded-md px-4 py-6 text-center text-xl font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-40 ${
+                      picked ? "outline outline-4 outline-offset-2 outline-white" : "hover:opacity-90"
+                    }`}
+                    style={{ background: tile }}
+                  >
+                    {picked && (
+                      <span className="absolute -top-2 -start-2 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow">
+                        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                          <path
+                            d="M2.5 6.5 L5 9 L9.5 3.5"
+                            fill="none"
+                            stroke={tile}
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    )}
+                    {o.text}
+                  </button>
+                );
+              })}
             </div>
           </motion.div>
-          {pickedId ? (
-            <p className="mt-8 text-center text-[color:var(--muted-ink)] result-in">
-              تم إرسال إجابتك — انتظر كشف النتيجة
-            </p>
-          ) : timeUp ? (
+          {timeUp ? (
             <p className="mt-8 text-center text-[color:var(--muted-ink)] result-in">
               انتهى الوقت — انتظر كشف النتيجة
+            </p>
+          ) : pickedId ? (
+            <p className="mt-8 text-center text-[color:var(--muted-ink)] result-in">
+              يمكنك تغيير إجابتك قبل انتهاء الوقت
             </p>
           ) : null}
         </section>

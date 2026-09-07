@@ -227,7 +227,7 @@ export function BubblePodium({ rows }: { rows: BubblePerson[] }) {
               initial={reduced ? { opacity: 0 } : false}
               animate={reduced ? { opacity: 1 } : undefined}
               transition={{ type: "spring", stiffness: 55, damping: 17 }}
-              className={`relative flex items-center justify-center rounded-full border-2 bg-[color:var(--wash)] text-center ${orbSizes[rank]} ${
+              className={`relative flex items-center justify-center rounded-full border-2 bg-[color:var(--wash)] text-center text-[color:var(--foreground)] ${orbSizes[rank]} ${
                 plates[rank].split(" ")[0]
               }`}
             >

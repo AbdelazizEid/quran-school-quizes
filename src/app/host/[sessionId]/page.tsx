@@ -10,12 +10,10 @@ import CountdownRing from "@/components/CountdownRing";
 import { Bubbles, BubblePodium, type BubblePerson, type BubbleTone } from "@/components/Bubbles";
 import VoteBar from "@/components/VoteBar";
 import Confetti from "@/components/Confetti";
+import { TILE_COLORS } from "@/lib/tiles";
 import { sfx } from "@/lib/sfx";
 
 const SECTION_EASE = [0.16, 1, 0.3, 1] as const;
-
-// Kahoot-style position colors, tuned to sit on the deep lapis stage
-const TILE_COLORS = ["#d64550", "#3d7fd9", "#d9930d", "#2f9e5f"];
 
 type AnswersUpdate = NonNullable<SessionState["answers"]> & { answered: string[] };
 
@@ -368,7 +366,7 @@ function HostBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-md bg-[color:var(--gold)] px-10 py-4 text-xl font-bold text-[color:var(--foreground)] shadow-lg transition-transform active:scale-[0.98] disabled:opacity-50"
+      className="rounded-md bg-[color:var(--gold)] px-10 py-4 text-xl font-bold text-white shadow-lg transition-transform active:scale-[0.98] disabled:opacity-50"
     >
       {children}
     </button>
