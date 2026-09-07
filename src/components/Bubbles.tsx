@@ -207,7 +207,7 @@ export function BubblePodium({ rows }: { rows: BubblePerson[] }) {
   const delays = [0.55, 0.28, 0];
   const plates = [
     "border-[color:var(--gold)] text-[color:var(--gold-deep)]",
-    "border-[color:var(--lapis)] text-[color:var(--lapis)]",
+    "border-[color:var(--stage-muted)] text-[color:var(--stage-muted)]",
     "border-[color:var(--rule)] text-[color:var(--muted-ink)]",
   ];
   const orbSizes = ["h-32 w-32", "h-[108px] w-[108px]", "h-[92px] w-[92px]"];
@@ -248,7 +248,7 @@ export function BubblePodium({ rows }: { rows: BubblePerson[] }) {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: delay + 0.1, duration: 0.45, ease: EASE }}
-              className="text-xl font-bold tabular-nums text-[color:var(--foreground)]" dir="ltr"
+              className="text-xl font-bold tabular-nums text-[color:var(--stage-ink)]" dir="ltr"
             >
               {p.totalScore}
             </motion.span>

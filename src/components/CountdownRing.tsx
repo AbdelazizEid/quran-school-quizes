@@ -14,6 +14,8 @@ export default function CountdownRing({
   minSizeText = "text-2xl",
   sound = false,
   onEnd,
+  variant = "ring",
+  className = "",
 }: {
   startedAt: number;
   durationMs: number;
@@ -22,6 +24,9 @@ export default function CountdownRing({
   minSizeText?: string;
   sound?: boolean;
   onEnd?: () => void;
+  /** "bar": full-width depleting bar + big seconds numeral, for the dark host stage */
+  variant?: "ring" | "bar";
+  className?: string;
 }) {
   const [remaining, setRemaining] = useState(() =>
     Math.max(0, durationMs - (Date.now() - startedAt))
@@ -99,8 +104,37 @@ export default function CountdownRing({
   const r = size / 2 - 5;
   const c = 2 * Math.PI * r;
   const frac = durationMs > 0 ? remaining / durationMs : 0;
-  const color = remaining <= 3000 ? "var(--red)" : `var(--${tone === "lapis" ? "lapis" : tone === "gold" ? "gold-deep" : "foreground"})`;
+  const urgent = remaining <= 3000;
+  const color =
+    variant === "bar"
+      ? urgent
+        ? "#ff7b6b"
+        : "var(--gold)"
+      : urgent
+        ? "var(--red)"
+        : `var(--${tone === "lapis" ? "lapis" : tone === "gold" ? "gold-deep" : "foreground"})`;
   const seconds = Math.ceil(remaining / 1000);
+
+  if (variant === "bar") {
+    return (
+      <div className={`w-full ${className}`} role="timer" aria-label={`${seconds} ثانية`}>
+        <span className="block text-4xl font-bold tabular-nums" style={{ color }} dir="ltr" aria-hidden="true">
+          {seconds}
+        </span>
+        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-white/20">
+          <div
+            className="h-full rounded-full"
+            style={{
+              background: color,
+              transform: `scaleX(${frac})`,
+              transformOrigin: "right",
+              transition: "transform 120ms linear",
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

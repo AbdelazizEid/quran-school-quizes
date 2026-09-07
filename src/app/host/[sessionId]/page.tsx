@@ -14,6 +14,9 @@ import { sfx } from "@/lib/sfx";
 
 const SECTION_EASE = [0.16, 1, 0.3, 1] as const;
 
+// Kahoot-style position colors, tuned to sit on the deep lapis stage
+const TILE_COLORS = ["#d64550", "#3d7fd9", "#d9930d", "#2f9e5f"];
+
 type AnswersUpdate = NonNullable<SessionState["answers"]> & { answered: string[] };
 
 export default function HostPage({ params }: { params: Promise<{ sessionId: string }> }) {
@@ -139,31 +142,25 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
   );
 
   if (!state) {
-    return <main className="min-h-screen p-10 text-[color:var(--muted-ink)]">جارٍ التحميل…</main>;
+    return <main className="min-h-screen bg-[color:var(--stage)] p-10 text-[color:var(--stage-muted)]">جارٍ التحميل…</main>;
   }
 
   return (
-    <main className="min-h-screen px-6 py-10 max-w-5xl mx-auto" dir="rtl">
+    <main className="min-h-screen bg-[color:var(--stage)] px-6 py-10 text-[color:var(--stage-ink)]" dir="rtl">
       <Confetti fire={confettiFire} />
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
+      <div className="max-w-5xl mx-auto">
+      <header className="flex items-baseline justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--gold-deep)]" dir="ltr">
+          <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--gold)]" dir="ltr">
             DAR MAKKAH — HOST
           </p>
           <h1 className="mt-2 text-2xl font-bold">{state.quizTitle}</h1>
         </div>
-        <div className="text-center">
-          <p className="text-xs text-[color:var(--muted-ink)]">رقم الجلسة</p>
-          <p className="text-4xl font-bold tracking-[0.15em] text-[color:var(--lapis)]" dir="ltr">
+        {state.phase !== "LOBBY" && (
+          <p className="text-2xl font-bold tracking-[0.15em] text-[color:var(--gold)]" dir="ltr">
             {state.joinCode}
           </p>
-          {state.phase === "LOBBY" && (
-            <div className="mt-4 flex flex-col items-center gap-2">
-              <canvas ref={qrRef} className="qr border-2 border-[color:var(--gold)] rounded-sm" aria-label="امسح الرمز للانضمام" />
-              <p className="text-sm text-[color:var(--muted-ink)]">امسح الرمز أو ادخل الرقم أعلاه</p>
-            </div>
-          )}
-        </div>
+        )}
       </header>
 
       {/* the strip lives through the whole session; lobby = scattered, then it docks */}
@@ -180,11 +177,21 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
       </div>
 
       {state.phase === "LOBBY" && (
-        <section>
-          <p className="text-center text-[color:var(--muted-ink)]">
-            {roster.length === 0 ? "شارك الرقم مع الطلاب للانضمام" : `الردهة — ${roster.length} طالبًا`}
+        <section className="mt-2 text-center">
+          <p className="text-lg font-semibold text-[color:var(--stage-muted)]">امسح الرمز أو ادخل رقم الجلسة</p>
+          <div className="mt-10 flex flex-col items-center justify-center gap-10 sm:flex-row">
+            <canvas ref={qrRef} className="qr rounded-md bg-white p-3 shadow-xl" aria-label="امسح الرمز للانضمام" />
+            <div>
+              <p className="text-sm font-semibold text-[color:var(--stage-muted)]">رقم الجلسة</p>
+              <p className="mt-2 text-7xl font-bold tracking-[0.1em] text-[color:var(--gold)] md:text-8xl" dir="ltr">
+                {state.joinCode}
+              </p>
+            </div>
+          </div>
+          <p className="mt-10 text-xl font-bold">
+            {roster.length === 0 ? "شارك الرقم مع الطلاب للانضمام" : `${roster.length} طالبًا في الردهة`}
           </p>
-          <div className="mt-8 text-center">
+          <div className="mt-10">
             <HostBtn onClick={() => hostEmit("start")} disabled={!connected || roster.length === 0}>
               ابدأ أول سؤال
             </HostBtn>
@@ -198,29 +205,37 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
           initial={reduced ? false : { opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: reduced ? 0 : 0.25, duration: 0.6, ease: SECTION_EASE }}
-          className="mt-10 max-w-2xl mx-auto text-center"
+          className="mt-8 max-w-4xl mx-auto"
         >
-          <div className="flex items-center justify-center gap-6">
-            <CountdownRing
-              startedAt={state.phaseStartedAt}
-              durationMs={state.question.timeLimitSec * 1000}
-              size={96}
-              minSizeText="text-3xl"
-              sound
-            />
-            <p className="text-[color:var(--muted-ink)]">
-              سؤال {state.questionIndex + 1} / {state.questionCount}
-            </p>
+          <div className="rounded-md bg-[color:var(--background)] px-6 py-6 text-[color:var(--foreground)] shadow-[0_12px_48px_rgba(0,0,0,0.4)] md:px-8">
+            <div className="flex items-center justify-between text-sm font-bold text-[color:var(--muted-ink)]">
+              <span>
+                سؤال {state.questionIndex + 1} / {state.questionCount}
+              </span>
+            </div>
+            <h2 className="mt-5 text-3xl font-bold leading-relaxed text-center text-balance md:text-4xl">
+              {state.question.text}
+            </h2>
           </div>
-          <h2 className="mt-8 text-2xl md:text-3xl font-bold leading-relaxed">{state.question.text}</h2>
-          <div className="mt-6 grid sm:grid-cols-2 gap-3">
-            {state.question.options.map((o) => (
-              <div key={o.id} className="px-4 py-3 text-center border border-[color:var(--rule)] rounded-sm bg-[color:var(--background)]">
+          <CountdownRing
+            variant="bar"
+            className="mt-4"
+            startedAt={state.phaseStartedAt}
+            durationMs={state.question.timeLimitSec * 1000}
+            sound
+          />
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {state.question.options.map((o, i) => (
+              <div
+                key={o.id}
+                className="rounded-md px-5 py-6 text-center text-xl font-bold text-white shadow-lg md:text-2xl"
+                style={{ background: TILE_COLORS[i % TILE_COLORS.length] }}
+              >
                 {o.text}
               </div>
             ))}
           </div>
-          <div className="mt-10">
+          <div className="mt-10 text-center">
             <HostBtn onClick={() => hostEmit("reveal")} disabled={!connected}>
               اكشف الإجابة
             </HostBtn>
@@ -234,31 +249,45 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
           initial={reduced ? false : { opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: reduced ? 0 : 0.25, duration: 0.6, ease: SECTION_EASE }}
-          className="mt-10 max-w-2xl mx-auto"
+          className="mt-8 max-w-4xl mx-auto"
         >
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-[color:var(--muted-ink)]">
+          <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--stage-muted)]">
+            <span>
               سؤال {state.questionIndex + 1} / {state.questionCount}
-            </p>
-            <p className="text-sm text-[color:var(--muted-ink)]" dir="ltr">
+            </span>
+            <span dir="ltr">
               {state.answers?.total ?? 0} / {roster.length}
-            </p>
+            </span>
           </div>
-          <h2 className="mt-4 text-center text-xl md:text-2xl font-bold leading-relaxed">
-            {state.question.text}
-          </h2>
-          <div className="mt-6 grid sm:grid-cols-2 gap-3">
-            {state.question.options.map((o) => (
+          <div className="mt-3 rounded-md bg-[color:var(--background)] px-6 py-5 text-center text-[color:var(--foreground)] shadow-[0_12px_48px_rgba(0,0,0,0.4)]">
+            <h2 className="text-2xl font-bold leading-relaxed text-balance md:text-3xl">{state.question.text}</h2>
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {state.question.options.map((o, i) => (
               <div
                 key={o.id}
-                className={`px-4 py-3 text-center border rounded-sm ${
-                  o.isCorrect
-                    ? "border-[color:var(--green)] bg-[color:var(--green-wash)] font-bold"
-                    : "border-[color:var(--rule)] opacity-70"
+                className={`relative rounded-md px-5 py-5 text-center text-xl font-bold text-white shadow-lg transition-opacity duration-500 md:text-2xl ${
+                  o.isCorrect ? "outline outline-4 outline-offset-4 outline-[color:var(--green)]" : "opacity-55"
                 }`}
+                style={{ background: TILE_COLORS[i % TILE_COLORS.length] }}
               >
+                {o.isCorrect && (
+                  <span className="absolute -top-3 -start-3 flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--green)] shadow-md">
+                    <svg width="18" height="18" viewBox="0 0 12 12" aria-hidden="true">
+                      <path
+                        d="M2.5 6.5 L5 9 L9.5 3.5"
+                        fill="none"
+                        stroke="#ffffff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                )}
                 {o.text}
                 <VoteBar
+                  light
                   count={state.answers?.counts?.[o.id] ?? 0}
                   total={state.answers?.total ?? 0}
                   correct={o.isCorrect}
@@ -295,7 +324,7 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
             <div className="mt-12 text-center">
               <Link
                 href={`/results/${sessionId}`}
-                className="inline-block px-8 py-4 text-lg font-semibold rounded-sm border border-[color:var(--gold)] text-[color:var(--foreground)] hover:bg-[color:var(--wash)]"
+                className="inline-block rounded-md border-2 border-[color:var(--gold)] px-8 py-4 text-lg font-semibold text-[color:var(--gold)] transition-colors hover:bg-white/10"
               >
                 عرض النتائج الكاملة
               </Link>
@@ -303,6 +332,7 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
           )}
         </section>
       )}
+      </div>
     </main>
   );
 }
@@ -311,10 +341,10 @@ function AlsoRan({ rows }: { rows: BubblePerson[] }) {
   const rest = rows.slice(3);
   if (rest.length === 0) return null;
   return (
-    <ol className="mx-auto mt-8 max-w-md border-t border-[color:var(--rule)]" aria-label="بقية الترتيب">
+    <ol className="mx-auto mt-8 max-w-md border-t border-white/15" aria-label="بقية الترتيب">
       {rest.map((p, i) => (
-        <li key={p.id} className="flex items-center gap-3 border-b border-[color:var(--rule)] px-4 py-2.5">
-          <span className="w-7 text-sm tabular-nums text-[color:var(--muted-ink)]">{i + 4}</span>
+        <li key={p.id} className="flex items-center gap-3 border-b border-white/15 px-4 py-2.5">
+          <span className="w-7 text-sm tabular-nums text-[color:var(--stage-muted)]">{i + 4}</span>
           <span className="truncate font-semibold">{p.nickname}</span>
           <span className="ms-auto tabular-nums" dir="ltr">
             {p.totalScore}
@@ -338,7 +368,7 @@ function HostBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="px-8 py-4 text-lg font-semibold rounded-sm bg-[color:var(--foreground)] text-[color:var(--background)] disabled:opacity-50 active:scale-[0.98] transition-transform"
+      className="rounded-md bg-[color:var(--gold)] px-10 py-4 text-xl font-bold text-[color:var(--foreground)] shadow-lg transition-transform active:scale-[0.98] disabled:opacity-50"
     >
       {children}
     </button>
