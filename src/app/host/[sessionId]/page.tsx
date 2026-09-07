@@ -213,6 +213,13 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
             </p>
           </div>
           <h2 className="mt-8 text-2xl md:text-3xl font-bold leading-relaxed">{state.question.text}</h2>
+          <div className="mt-6 grid sm:grid-cols-2 gap-3">
+            {state.question.options.map((o) => (
+              <div key={o.id} className="px-4 py-3 text-center border border-[color:var(--rule)] rounded-sm bg-[color:var(--background)]">
+                {o.text}
+              </div>
+            ))}
+          </div>
           <div className="mt-10">
             <HostBtn onClick={() => hostEmit("reveal")} disabled={!connected}>
               اكشف الإجابة
@@ -246,7 +253,7 @@ export default function HostPage({ params }: { params: Promise<{ sessionId: stri
                 key={o.id}
                 className={`px-4 py-3 text-center border rounded-sm ${
                   o.isCorrect
-                    ? "border-[color:var(--gold)] bg-[color:var(--wash)] font-bold"
+                    ? "border-[color:var(--green)] bg-[color:var(--green-wash)] font-bold"
                     : "border-[color:var(--rule)] opacity-70"
                 }`}
               >

@@ -83,7 +83,7 @@ export default function PracticePage({ params }: { params: Promise<{ quizId: str
                 const outcome =
                   result &&
                   (o.isCorrect
-                    ? "border-[color:var(--gold)] bg-[color:var(--wash)] font-bold"
+                    ? "border-[color:var(--green)] bg-[color:var(--green-wash)] font-bold"
                     : selected
                       ? "border-[color:var(--red)] opacity-70"
                       : "opacity-60");
@@ -135,7 +135,7 @@ function Outcome({ qid, result }: { qid: string; result: PracticeResult }) {
   return (
     <p
       className="mt-3 text-sm font-semibold"
-      style={{ color: r.isCorrect ? "var(--gold-deep)" : "var(--red)" }}
+      style={{ color: r.isCorrect ? "var(--green-deep)" : "var(--red)" }}
     >
       {r.isCorrect ? "إجابة صحيحة" : "إجابة خاطئة"}
     </p>

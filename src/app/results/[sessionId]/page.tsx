@@ -94,7 +94,7 @@ export default function SessionResultsPage() {
                   <span className="w-28 truncate text-sm">{o.text}</span>
                   <div className="grow h-4 bg-[color:var(--wash)] rounded-sm overflow-hidden">
                     <div
-                      className={`h-full ${o.isCorrect ? "bg-[color:var(--gold)]" : "bg-[color:var(--lapis)]"}`}
+                      className={`h-full ${o.isCorrect ? "bg-[color:var(--green)]" : "bg-[color:var(--lapis)]"}`}
                       style={{ width: `${(o.count / maxCount) * 100}%` }}
                     />
                   </div>

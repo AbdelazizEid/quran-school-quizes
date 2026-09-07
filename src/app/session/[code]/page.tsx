@@ -245,7 +245,7 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
               <p className="flex items-baseline justify-center gap-3">
                 <span
                   className="text-2xl font-bold"
-                  style={{ color: shown.correct ? "var(--gold-deep)" : "var(--red)" }}
+                  style={{ color: shown.correct ? "var(--green-deep)" : "var(--red)" }}
                 >
                   {shown.correct ? "إجابة صحيحة!" : "إجابة غير صحيحة"}
                 </span>
@@ -279,14 +279,14 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
                 key={o.id}
                 className={`px-4 py-2.5 rounded-sm border-2 ${
                   o.isCorrect
-                    ? "border-[color:var(--gold)] bg-[color:var(--wash)]"
+                    ? "border-[color:var(--green)] bg-[color:var(--green-wash)]"
                     : pickedId === o.id
                       ? "border-[color:var(--red)] opacity-80 result-shake"
                       : "border-[color:var(--rule)] opacity-60"
                 }`}
               >
                 {o.isCorrect && (
-                  <div className="text-xs font-bold tracking-wide text-[color:var(--gold-deep)] text-center">
+                  <div className="text-xs font-bold tracking-wide text-[color:var(--green-deep)] text-center">
                     الإجابة الصحيحة
                   </div>
                 )}

@@ -14,8 +14,9 @@ const toneFace: Record<BubbleTone, string> = {
   neutral: "border-[color:var(--rule)] bg-[color:var(--background)] text-[color:var(--foreground)]",
   lit: "border-[color:var(--gold)] bg-[color:var(--wash)] text-[color:var(--foreground)] bubble-lit",
   correct:
-    "border-[color:var(--gold)] bg-[color:var(--wash)] text-[color:var(--foreground)] bubble-pop",
-  wrong: "border-[color:var(--red)] bg-[color:var(--background)] text-[color:var(--foreground)] result-shake",
+    "border-[color:var(--green)] bg-[color:var(--green-wash)] text-[color:var(--foreground)] bubble-pop",
+  wrong:
+    "border-[color:var(--red)] bg-[color:var(--background)] text-[color:var(--foreground)] result-shake",
   asleep: "border-[color:var(--rule)] bg-[color:var(--background)] text-[color:var(--muted-ink)] opacity-60",
   deflated: "border-[color:var(--rule)] bg-transparent text-[color:var(--muted-ink)]",
 };
@@ -98,15 +99,28 @@ function Bubble({
               </motion.span>
             )}
             {tone === "correct" && (
-              <span className="absolute -top-1.5 -start-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[color:var(--gold)] bg-[color:var(--background)]">
+              <span className="absolute -top-1.5 -start-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[color:var(--green)] bg-[color:var(--background)]">
                 <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
                   <path
                     d="M2.5 6.5 L5 9 L9.5 3.5"
                     fill="none"
-                    stroke="var(--gold-deep)"
+                    stroke="var(--green-deep)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+            )}
+            {tone === "wrong" && (
+              <span className="absolute -top-1.5 -start-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[color:var(--red)] bg-[color:var(--background)]">
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                  <path
+                    d="M2 2 L8 8 M8 2 L2 8"
+                    fill="none"
+                    stroke="var(--red)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
                   />
                 </svg>
               </span>

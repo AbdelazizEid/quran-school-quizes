@@ -143,7 +143,7 @@ test("chat revisions apply directly to the draft and saving flows through confir
   expect((await premature.json()).response.type).toBe("clarification");
   const blocked = await request.post(`/api/ai-quiz-drafts/${secondId}/save`);
   expect(blocked.status()).toBe(400);
-  expect((await blocked.json()).error).toBe("questions-required");
+  expect((await blocked.json()).error).toBe("title-required");
   await request.delete(`/api/ai-quiz-drafts/${secondId}`);
 
   expect((await request.get("/api/ai-quiz-drafts/not-owned-by-this-teacher")).status()).toBe(404);
@@ -358,6 +358,7 @@ test("draft page manages sources and source policy from the composer", async ({ 
   const policySelect = page.getByLabel("سياسة المصدر");
   await expect(policySelect).toHaveValue("GENERAL_KNOWLEDGE_ONLY");
 
+  await page.getByText("لصق نص مصدر").click();
   await page.getByLabel("اسم المصدر (اختياري)").fill("ملخص الفاتحة");
   await page.getByLabel("نص المصدر الملصق").fill("سورة الفاتحة سبع آيات وتسمى أم الكتاب.");
   await page.getByRole("button", { name: "إضافة النص الملصق" }).click();
@@ -555,8 +556,8 @@ test("teacher sees excerpt and page reference in the chat cards and on the saved
   });
 
   await page.goto(`/ai-quiz-drafts/${id}`);
-  await expect(page.getByRole("heading", { name: "محادثة مسودة اختبار" })).toBeVisible({ timeout: 15000 });
   const cards = page.getByRole("region", { name: "الأسئلة الحالية" });
+  await expect(cards).toBeVisible({ timeout: 15000 });
   await expect(cards.getByText(/ملخص الفاتحة/).first()).toBeVisible();
   await expect(page.getByText(/الصفحة الثالثة/).first()).toBeVisible();
   await expect(page.getByText(/«سورة الفاتحة سبع آيات/).first()).toBeVisible();
@@ -582,6 +583,7 @@ test("complete teacher journey: source input, Source Policy, generation, chat re
   await expect(page.getByRole("heading", { name: "محادثة مسودة اختبار" })).toBeVisible({ timeout: 15000 });
   await page.waitForLoadState("networkidle");
 
+  await page.getByText("لصق نص مصدر").click();
   await page.getByLabel("نص المصدر الملصق").fill("سورة الفاتحة سبع آيات، وتسمى أم الكتاب، وهي أول سورة في المصحف.");
   await page.getByRole("button", { name: "إضافة النص الملصق" }).click();
   await expect(page.getByText("تمت إضافة المصدر إلى المسودة.")).toBeVisible({ timeout: 15000 });

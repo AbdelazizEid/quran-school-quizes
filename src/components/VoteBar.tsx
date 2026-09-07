@@ -23,7 +23,7 @@ export default function VoteBar({
   }, [pct]);
 
   const fill = {
-    background: correct ? "var(--gold)" : "var(--foreground)",
+    background: correct ? "var(--green)" : "var(--foreground)",
     opacity: correct ? 1 : 0.5,
     transition: "700ms cubic-bezier(0.16, 1, 0.3, 1)",
   } as const;
