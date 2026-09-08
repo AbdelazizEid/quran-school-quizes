@@ -20,7 +20,7 @@ type QuizForm = { title: string; description: string; questions: QuestionInput[]
 const emptyQuestion = (): QuestionInput => ({
   kind: "MCQ",
   text: "",
-  timeLimitSec: 20,
+  timeLimitSec: 25,
   options: [
     { text: "", isCorrect: true },
     { text: "", isCorrect: false },
@@ -47,7 +47,7 @@ export default function QuizEditorPage() {
           questions: data.quiz.questions.map((q: Record<string, unknown> & { options: { text: string; isCorrect: boolean }[] }) => ({
             kind: q.kind as QuestionInput["kind"],
             text: q.text as string,
-            timeLimitSec: (q.timeLimitSec as number) ?? 20,
+            timeLimitSec: (q.timeLimitSec as number) ?? 25,
             options: (q.options ?? []).map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
             sourceEvidence: (q.sourceEvidence as SourceEvidence | null) ?? null,
           })),
@@ -161,7 +161,7 @@ export default function QuizEditorPage() {
                   min={5}
                   max={120}
                   value={q.timeLimitSec}
-                  onChange={(e) => setQuestion(qi, { timeLimitSec: Number(e.target.value) || 20 })}
+                  onChange={(e) => setQuestion(qi, { timeLimitSec: Number(e.target.value) || 25 })}
                   className="w-16 py-2 px-2 text-center border border-[color:var(--rule)] rounded-sm"
                 />
               </label>

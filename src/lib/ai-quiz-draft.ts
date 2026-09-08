@@ -203,7 +203,7 @@ export function normalizeManualQuestions(questions: unknown): DraftQuestion[] {
 }
 
 function timeLimitOf(question: ManualQuestionInput): number {
-  return typeof question.timeLimitSec === "number" ? question.timeLimitSec : 20;
+  return typeof question.timeLimitSec === "number" ? question.timeLimitSec : 25;
 }
 
 export function draftMessages(value: unknown): DraftMessage[] {

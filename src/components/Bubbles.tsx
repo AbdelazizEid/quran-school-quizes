@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { seededShuffle } from "@/lib/shuffle";
 
-export type BubblePerson = { id: string; nickname: string; totalScore: number; streak?: number };
+export type BubblePerson = { id: string; nickname: string; totalScore: number };
 export type BubbleTone = "neutral" | "lit" | "correct" | "wrong" | "asleep" | "deflated";
 
 // Lighting speaks the board's language: gold ink emphasis, never a glow.
@@ -86,9 +86,7 @@ function Bubble({
             transition={{ type: "spring", stiffness: 55, damping: 17 }}
             className={`relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-2 text-center transition-[background-color,border-color,color,opacity] duration-500 ease-out ${toneFace[tone]}`}
           >
-            {(person.streak ?? 0) >= 2 && tone !== "deflated" && <Flame />}
-            {points && (
-              <motion.span
+            {points && (              <motion.span
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: [0, 1, 1, 1, 0], y: -26 }}
                 transition={{ duration: 2.6, ease: "easeOut", delay: points.delay ?? 0.35 }}
@@ -132,19 +130,6 @@ function Bubble({
         </motion.div>
       </motion.div>
     </motion.div>
-  );
-}
-
-function Flame() {
-  return (
-    <span className="medallion-breathe absolute -top-2.5 end-1" aria-hidden="true">
-      <svg width="12" height="14" viewBox="0 0 12 14">
-        <path
-          d="M6 0.5 C7.5 3 10.5 4.5 10.5 8 A4.5 4.5 0 0 1 1.5 8 C1.5 6 2.5 5 3.2 3.8 C4 5 5 5.5 5 5.5 C5 3.5 5.2 2 6 0.5 Z"
-          fill="var(--gold)"
-        />
-      </svg>
-    </span>
   );
 }
 
@@ -231,7 +216,6 @@ export function BubblePodium({ rows }: { rows: BubblePerson[] }) {
                 plates[rank].split(" ")[0]
               }`}
             >
-              {(p.streak ?? 0) >= 2 && <Flame />}
               <span className={`truncate px-1 font-bold leading-snug ${nameWidths[rank]} ${nameSizes[rank]}`}>
                 {p.nickname}
               </span>

@@ -4,9 +4,3 @@ export const WRONG_PATS = ["قريب! السؤال الجاي لك", "محاول
 export function pickOne<T>(list: readonly T[]): T {
   return list[Math.floor(Math.random() * list.length)];
 }
-
-export function streakCheer(streak: number): string {
-  if (streak >= 5) return "أسطوري!";
-  if (streak >= 3) return "مذهل!";
-  return "سلسلة متتالية";
-}

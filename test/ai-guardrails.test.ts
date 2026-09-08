@@ -107,7 +107,7 @@ test("manual question input is normalized so the shared validator judges what ge
   const [tf, input, mcq] = normalized;
   assert.deepEqual(tf.options.map((o) => o.text), ["صح", "خطأ"]);
   assert.deepEqual(input.options, []); // stale INPUT options are dropped, not stored
-  assert.equal(mcq.timeLimitSec, 20); // omitted time limit defaults
+  assert.equal(mcq.timeLimitSec, 25); // omitted time limit defaults
 
   // >4 MCQ options are no longer silently truncated — they are rejected
   const tooMany = normalizeManualQuestions([

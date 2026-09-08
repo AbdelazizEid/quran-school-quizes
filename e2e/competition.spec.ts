@@ -36,7 +36,7 @@ function waitPhase(sock: Socket, phase: string, timeoutMs = 10000): Promise<Stat
 const emitAck = <T>(sock: Socket, event: string, payload: unknown) =>
   new Promise<T>((resolve) => sock.emit(event, payload, resolve as never));
 
-test("live competition: nickname dedupe, hidden answer, stable shuffle, streak bonus, persistence", async ({
+test("live competition: nickname dedupe, hidden answer, stable shuffle, re-answer, persistence", async ({
   request,
 }) => {
   const quiz = (
@@ -89,19 +89,17 @@ test("live competition: nickname dedupe, hidden answer, stable shuffle, streak b
     const s2q1 = await waitPhase(s2, "QUESTION");
     expect(q1.question!.options.map((o) => o.id)).toEqual(s2q1.question!.options.map((o) => o.id));
 
-    const r1 = await emitAck<{ points: number; streak: number; bonus: number }>(s1, "answer", {
+    const r1 = await emitAck<{ points: number }>(s1, "answer", {
       optionId: correctIds[0],
       timeMs: 1500,
     });
     expect(r1.points).toBeGreaterThan(0);
-    expect(r1.streak).toBe(1);
-    expect(r1.bonus).toBe(0);
 
     const firstOpt = s2q1.question!.options[0];
     await emitAck(s2, "answer", { optionId: firstOpt.id, timeMs: 8000 });
 
     const dup = await emitAck<{ accepted: boolean }>(s1, "answer", { optionId: firstOpt.id, timeMs: 3000 });
-    expect(dup.accepted).toBe(false);
+    expect(dup.accepted).toBe(true); // re-answer within the question window overwrites
 
     host.emit("reveal");
     const rev = await waitPhase(s1, "ANSWER_REVIEW");
@@ -119,13 +117,11 @@ test("live competition: nickname dedupe, hidden answer, stable shuffle, streak b
 
     const r3 = await emitAck<{ correct: boolean }>(s2, "answer", { optionId: sahih.id, timeMs: 2000 });
     expect(r3.correct).toBe(true);
-    const r1b = await emitAck<{ correct: boolean; streak: number; bonus: number }>(s1, "answer", {
+    const r1b = await emitAck<{ correct: boolean }>(s1, "answer", {
       optionId: sahih.id,
       timeMs: 2500,
     });
     expect(r1b.correct).toBe(true);
-    expect(r1b.streak).toBe(2);
-    expect(r1b.bonus).toBe(100);
 
     host.emit("reveal");
     await waitPhase(s1, "ANSWER_REVIEW");
@@ -149,7 +145,6 @@ test("live competition: nickname dedupe, hidden answer, stable shuffle, streak b
   await prisma.$disconnect();
   expect(dbSession?.answers).toHaveLength(4);
   expect(dbSession?.participants.every((p) => p.totalScore >= 0)).toBe(true);
-  expect(dbSession?.participants.find((p) => p.nickname === "أحمد")?.streak).toBe(2);
 
   const results = await (await request.get("/api/sessions")).json();
   expect(results.sessions.find((s: { id: string }) => s.id === session.id)?.participantCount).toBe(2);

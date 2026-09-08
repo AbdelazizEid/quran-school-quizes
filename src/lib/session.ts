@@ -104,7 +104,7 @@ export async function submitAnswer(
   participantId: string,
   chosenOptionId: string | null,
   timeMs: number
-): Promise<{ accepted: boolean; correct: boolean; points: number; bonus: number; streak: number }> {
+): Promise<{ accepted: boolean; correct: boolean; points: number }> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
     include: {
@@ -116,16 +116,16 @@ export async function submitAnswer(
     },
   });
   if (!session || session.phase !== "QUESTION" || !session.questionStartedAt) {
-    return { accepted: false, correct: false, points: 0, bonus: 0, streak: 0 };
+    return { accepted: false, correct: false, points: 0 };
   }
 
   const question = session.quiz.questions[session.currentQuestionIndex];
-  if (!question) return { accepted: false, correct: false, points: 0, bonus: 0, streak: 0 };
+  if (!question) return { accepted: false, correct: false, points: 0 };
 
   // enforce the question time limit server-side (1.5s grace for latency/clock skew)
   const elapsedMs = Date.now() - session.questionStartedAt.getTime();
   if (elapsedMs > question.timeLimitSec * 1000 + 1500) {
-    return { accepted: false, correct: false, points: 0, bonus: 0, streak: 0 };
+    return { accepted: false, correct: false, points: 0 };
   }
 
   const already = await prisma.sessionAnswer.findFirst({
@@ -135,21 +135,14 @@ export async function submitAnswer(
   const correctOption = question.options.find((o) => o.isCorrect);
   const correct = correctOption?.id === chosenOptionId;
 
-  const participant = await prisma.sessionParticipant.findUniqueOrThrow({
-    where: { id: participantId },
-  });
-
   const limitMs = question.timeLimitSec * 1000;
   const clampedMs = Math.min(Math.max(timeMs, 0), limitMs);
   const remaining = 1 - clampedMs / limitMs;
+  const points = correct ? Math.round(500 + 500 * remaining) : 0;
 
   // a second pick within the question window overwrites the first answer:
-  // last timeMs counts, score adjusts by the points delta, streak recomputed
+  // last timeMs counts, score adjusts by the points delta
   if (already) {
-    const priorStreak = already.isCorrect ? participant.streak - 1 : participant.streak;
-    const streak = correct ? priorStreak + 1 : 0;
-    const bonus = correct ? Math.min(100 * Math.max(0, streak - 1), 500) : 0;
-    const points = correct ? Math.round(500 + 500 * remaining) + bonus : 0;
     await prisma.$transaction([
       prisma.sessionAnswer.update({
         where: { id: already.id },
@@ -157,19 +150,11 @@ export async function submitAnswer(
       }),
       prisma.sessionParticipant.update({
         where: { id: participantId },
-        data: {
-          totalScore: { decrement: already.points - points },
-          streak,
-        },
+        data: { totalScore: { decrement: already.points - points } },
       }),
     ]);
-    return { accepted: true, correct, points, bonus, streak };
+    return { accepted: true, correct, points };
   }
-
-  const streak = correct ? participant.streak + 1 : 0;
-  const bonus = correct ? Math.min(100 * Math.max(0, streak - 1), 500) : 0;
-
-  const points = correct ? Math.round(500 + 500 * remaining) + bonus : 0;
 
   await prisma.$transaction([
     prisma.sessionAnswer.create({
@@ -185,11 +170,11 @@ export async function submitAnswer(
     }),
     prisma.sessionParticipant.update({
       where: { id: participantId },
-      data: { totalScore: { increment: points }, streak },
+      data: { totalScore: { increment: points } },
     }),
   ]);
 
-  return { accepted: true, correct, points, bonus, streak };
+  return { accepted: true, correct, points };
 }
 
 export async function distribution(sessionId: string, questionId: string) {
@@ -214,6 +199,6 @@ export async function participants(sessionId: string, order: "name" | "score") {
   return prisma.sessionParticipant.findMany({
     where: { sessionId },
     orderBy: order === "score" ? [{ totalScore: "desc" }, { nickname: "asc" }] : { nickname: "asc" },
-    select: { id: true, nickname: true, totalScore: true, streak: true },
+    select: { id: true, nickname: true, totalScore: true },
   });
 }

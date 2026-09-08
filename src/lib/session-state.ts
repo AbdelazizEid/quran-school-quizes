@@ -13,8 +13,8 @@ export type SessionState = {
     options: { id: string; text: string; isCorrect?: boolean }[];
   } | null;
   answers?: { counts: Record<string, number>; total: number; answered?: string[] };
-  roster?: { id: string; nickname: string; totalScore: number; streak?: number }[];
-  leaderboard?: { id: string; nickname: string; totalScore: number; streak?: number }[];
-  results?: Record<string, { correct: boolean; points: number; bonus: number; streak: number; timeMs: number }>;
+  roster?: { id: string; nickname: string; totalScore: number }[];
+  leaderboard?: { id: string; nickname: string; totalScore: number }[];
+  results?: Record<string, { correct: boolean; points: number; timeMs: number }>;
   online?: string[];
 };

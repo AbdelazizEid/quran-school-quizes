@@ -111,7 +111,6 @@ model SessionParticipant {
   student     Student?  @relation(fields: [studentId], references: [id])
   nickname   String
   totalScore Int       @default(0)
-  streak     Int       @default(0)
 
   answers    SessionAnswer[]
 

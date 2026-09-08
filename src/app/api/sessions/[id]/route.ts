@@ -34,7 +34,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         id: p.id,
         nickname: p.nickname,
         totalScore: p.totalScore,
-        streak: p.streak,
       })),
       questions: session.quiz.questions.map((q) => {
         const qAnswers = session.answers.filter((a) => a.questionId === q.id);

@@ -11,10 +11,10 @@ import VoteBar from "@/components/VoteBar";
 import Confetti from "@/components/Confetti";
 import { sfx } from "@/lib/sfx";
 import { TILE_COLORS } from "@/lib/tiles";
-import { CORRECT_CHEERS, WRONG_PATS, pickOne, streakCheer } from "@/lib/cheer";
+import { CORRECT_CHEERS, WRONG_PATS, pickOne } from "@/lib/cheer";
 
 type JoinResult = { ok: boolean; participantId?: string; nickname?: string; error?: string };
-type AnswerResult = { ok: boolean; correct?: boolean; points?: number; bonus?: number; streak?: number };
+  type AnswerResult = { ok: boolean; correct?: boolean; points?: number };
 
 export default function StudentSessionPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
@@ -276,12 +276,6 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
                 }`}
               >
                 <span>{cheerLine}</span>
-                {shown.correct && (shown.streak ?? 0) >= 2 && (
-                  <span className="inline-flex items-center gap-1.5 text-[color:var(--gold-deep)]">
-                    <Spark />
-                    {streakCheer(shown.streak ?? 0)} ×{shown.streak} — مكافأة +{shown.bonus}
-                  </span>
-                )}
               </p>
             </motion.div>
           )}
@@ -348,20 +342,6 @@ export default function StudentSessionPage({ params }: { params: Promise<{ code:
         </section>
       )}
     </Shell>
-  );
-}
-
-function Spark() {
-  return (
-    <svg className="sb-spark" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-      <path
-        d="M9 1 L10.8 6.6 L16.5 7 L12.2 10.6 L13.7 16.2 L9 13.2 L4.3 16.2 L5.8 10.6 L1.5 7 L7.2 6.6 Z"
-        fill="none"
-        stroke="var(--gold)"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 
