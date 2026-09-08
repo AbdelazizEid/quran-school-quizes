@@ -49,4 +49,9 @@ export const sfx = {
   fanfare() {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => note(f, i * 0.12, 0.25));
   },
+  prize() {
+    // coin-style double ding, one per earned score landing on a bubble
+    note(987.77, 0, 0.09, 0.06, "square");
+    note(1318.51, 0.08, 0.3, 0.06, "square");
+  },
 };

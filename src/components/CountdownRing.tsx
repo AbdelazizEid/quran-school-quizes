@@ -108,8 +108,8 @@ export default function CountdownRing({
   const color =
     variant === "bar"
       ? urgent
-        ? "#ff7b6b"
-        : "var(--gold)"
+        ? "var(--red)"
+        : "var(--gold-deep)"
       : urgent
         ? "var(--red)"
         : `var(--${tone === "lapis" ? "lapis" : tone === "gold" ? "gold-deep" : "foreground"})`;
@@ -121,7 +121,7 @@ export default function CountdownRing({
         <span className="block text-4xl font-bold tabular-nums" style={{ color }} dir="ltr" aria-hidden="true">
           {seconds}
         </span>
-        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-white/20">
+        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-[color:var(--rule)]">
           <div
             className="h-full rounded-full"
             style={{

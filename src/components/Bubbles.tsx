@@ -44,7 +44,7 @@ function Bubble({
   person: BubblePerson;
   tone: BubbleTone;
   variant: "float" | "strip";
-  points?: string | null;
+  points?: { text: string; delay?: number } | null;
 }) {
   const reduced = useReducedMotion();
   const h = useMemo(() => hash(person.id), [person.id]);
@@ -90,12 +90,12 @@ function Bubble({
             {points && (
               <motion.span
                 initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: [0, 1, 1, 0], y: -26 }}
-                transition={{ duration: 1.8, ease: "easeOut", delay: 0.35 }}
+                animate={{ opacity: [0, 1, 1, 1, 0], y: -26 }}
+                transition={{ duration: 2.6, ease: "easeOut", delay: points.delay ?? 0.35 }}
                 dir="ltr"
                 className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-sm bg-[color:var(--gold)] px-1.5 py-0.5 text-xs font-bold tabular-nums text-[color:var(--background)]"
               >
-                {points}
+                {points.text}
               </motion.span>
             )}
             {tone === "correct" && (
@@ -168,7 +168,7 @@ export function Bubbles({
   variant: "float" | "strip";
   orderSeed?: number;
   dimmed?: boolean;
-  pointsByBubble?: Record<string, string>;
+  pointsByBubble?: Record<string, { text: string; delay?: number }>;
   ariaLabel: string;
   className?: string;
 }) {
@@ -207,7 +207,7 @@ export function BubblePodium({ rows }: { rows: BubblePerson[] }) {
   const delays = [0.55, 0.28, 0];
   const plates = [
     "border-[color:var(--gold)] text-[color:var(--gold-deep)]",
-    "border-[color:var(--stage-muted)] text-[color:var(--stage-muted)]",
+    "border-[color:var(--lapis)] text-[color:var(--lapis)]",
     "border-[color:var(--rule)] text-[color:var(--muted-ink)]",
   ];
   const orbSizes = ["h-32 w-32", "h-[108px] w-[108px]", "h-[92px] w-[92px]"];
@@ -248,7 +248,7 @@ export function BubblePodium({ rows }: { rows: BubblePerson[] }) {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: delay + 0.1, duration: 0.45, ease: EASE }}
-              className="text-xl font-bold tabular-nums text-[color:var(--stage-ink)]" dir="ltr"
+              className="text-xl font-bold tabular-nums text-[color:var(--foreground)]" dir="ltr"
             >
               {p.totalScore}
             </motion.span>

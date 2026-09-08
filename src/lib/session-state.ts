@@ -15,6 +15,6 @@ export type SessionState = {
   answers?: { counts: Record<string, number>; total: number; answered?: string[] };
   roster?: { id: string; nickname: string; totalScore: number; streak?: number }[];
   leaderboard?: { id: string; nickname: string; totalScore: number; streak?: number }[];
-  results?: Record<string, { correct: boolean; points: number; bonus: number; streak: number }>;
+  results?: Record<string, { correct: boolean; points: number; bonus: number; streak: number; timeMs: number }>;
   online?: string[];
 };

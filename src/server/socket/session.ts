@@ -62,12 +62,12 @@ export async function emitState(io: SessionNS, sessionId: string) {
 
   // per-student outcome of the question under review, so pages that
   // (re)connect after answering can still render their result card
-  let results: Record<string, { correct: boolean; points: number; bonus: number; streak: number }> | undefined;
+  let results: Record<string, { correct: boolean; points: number; bonus: number; streak: number; timeMs: number }> | undefined;
   if (session.phase === "ANSWER_REVIEW" && q) {
     const [rows, parts] = await Promise.all([
       prisma.sessionAnswer.findMany({
         where: { sessionId, questionId: q.id },
-        select: { participantId: true, isCorrect: true, points: true },
+        select: { participantId: true, isCorrect: true, points: true, timeMs: true },
       }),
       prisma.sessionParticipant.findMany({
         where: { sessionId },
@@ -83,6 +83,7 @@ export async function emitState(io: SessionNS, sessionId: string) {
         points: r.points,
         bonus: r.isCorrect ? Math.min(100 * Math.max(0, streak - 1), 500) : 0,
         streak,
+        timeMs: r.timeMs,
       };
     }
   }
